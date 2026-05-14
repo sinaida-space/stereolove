@@ -1,0 +1,8 @@
+.DS_Store
+screenshot*.png
+dist/
+coverage/
+node_modules/
+.vite/
+.env
+.env.*
