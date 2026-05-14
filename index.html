@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stereolove</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="app">
+      <canvas id="stage" aria-label="Interactive head-coupled perspective artwork"></canvas>
+
+      <section class="panel" aria-label="Artwork controls">
+        <div class="title">
+          <span class="kicker">head-coupled op art</span>
+          <h1>Stereolove</h1>
+        </div>
+
+        <div class="status-row">
+          <span id="statusDot" class="status-dot idle"></span>
+          <span id="statusText">Pointer mode</span>
+        </div>
+
+        <div class="actions">
+          <button id="cameraButton" type="button">Start camera</button>
+          <button id="calibrateButton" type="button">Calibrate</button>
+        </div>
+
+        <label class="control">
+          <span>Depth</span>
+          <input id="depthSlider" type="range" min="0.65" max="1.6" step="0.01" value="1" />
+        </label>
+
+        <label class="control">
+          <span>Sensitivity</span>
+          <input id="sensitivitySlider" type="range" min="0.55" max="1.8" step="0.01" value="1" />
+        </label>
+
+        <div class="readout" aria-label="Tracking readout">
+          <span id="xReadout">x 0.00</span>
+          <span id="yReadout">y 0.00</span>
+          <span id="zReadout">z 3.20</span>
+        </div>
+      </section>
+
+      <video id="webcam" playsinline muted></video>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
