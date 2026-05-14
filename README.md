@@ -4,6 +4,14 @@ Stereolove is a head-coupled op-art installation about perception, perspective, 
 
 The browser estimates the viewer's head position with MediaPipe Face Landmarker and changes the projection so the monitor behaves like a window into a geometric optical chamber. Without a camera, the same effect works in pointer mode with a mouse or trackpad.
 
+## Live Site
+
+Production deployment:
+
+```text
+https://sinaida-space.github.io/stereolove/
+```
+
 ## Concept
 
 The piece is called **The Reality Negotiator**. It uses psychedelic geometry, op-art line interference, fractal rosettes, and anamorphic text to explore a simple question: what changes when reality is viewed from another position?
@@ -41,6 +49,10 @@ npm run lint     # ESLint
 npm run format   # Prettier
 npm run check    # lint, test, and build
 ```
+
+## Deployment
+
+The site is deployed to GitHub Pages by `.github/workflows/deploy-pages.yml` whenever `main` is updated. Vite is configured with `base: "/stereolove/"` so production assets resolve correctly from the project page path.
 
 ## Camera Mode
 
