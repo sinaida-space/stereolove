@@ -4,6 +4,8 @@ Stereolove is a head-coupled op-art installation about perception, perspective, 
 
 The browser estimates the viewer's head position with MediaPipe Face Landmarker and changes the projection so the monitor behaves like a window into a geometric optical chamber. Without a camera, the same effect works in pointer mode with a mouse or trackpad.
 
+The current scene turns the monitor into the front opening of a deep box. Questions appear as dot typography on the tunnel walls, and the chamber opens toward the viewer's current point of view.
+
 ## Live Site
 
 Production deployment:
@@ -68,6 +70,7 @@ src/
   face-tracking.js  dynamic MediaPipe loader and face measurement
   main.js           app lifecycle and interaction state
   projection.js     pure head-coupled projection math
+  questions.js      wall question prompts
   scene.js          canvas rendering and visual system
   text-sampler.js   anamorphic text point sampling
 test/
