@@ -10,6 +10,10 @@ const statusDot = document.querySelector("#statusDot");
 const statusText = document.querySelector("#statusText");
 const cameraButton = document.querySelector("#cameraButton");
 const calibrateButton = document.querySelector("#calibrateButton");
+const experienceButton = document.querySelector("#experienceButton");
+const exitExperienceButton = document.querySelector("#exitExperienceButton");
+const cookieBanner = document.querySelector("#cookieBanner");
+const cookieAcceptButton = document.querySelector("#cookieAcceptButton");
 const depthSlider = document.querySelector("#depthSlider");
 const sensitivitySlider = document.querySelector("#sensitivitySlider");
 const xReadout = document.querySelector("#xReadout");
@@ -34,6 +38,7 @@ const neutralFace = { x: 0.5, y: 0.48, eyeSep: 0.17, ready: false };
 
 resize();
 scene = createScene(screen);
+hydrateCookieBanner();
 animate();
 
 cameraButton.addEventListener("click", () => {
@@ -55,6 +60,18 @@ calibrateButton.addEventListener("click", () => {
   pointer.y = 0;
   Object.assign(targetEye, DEFAULT_EYE);
   setStatus(cameraMode ? "Looking for face" : "Pointer centered", "idle");
+});
+
+experienceButton.addEventListener("click", enterExperience);
+exitExperienceButton.addEventListener("click", exitExperience);
+cookieAcceptButton.addEventListener("click", acceptCookieNotice);
+
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement) document.body.classList.remove("experience-active");
+});
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") exitExperience();
 });
 
 window.addEventListener("pointermove", (event) => {
@@ -178,4 +195,37 @@ function updateReadout() {
   xReadout.textContent = `x ${eye.x.toFixed(2)}`;
   yReadout.textContent = `y ${eye.y.toFixed(2)}`;
   zReadout.textContent = `z ${eye.z.toFixed(2)}`;
+}
+
+async function enterExperience() {
+  document.body.classList.add("experience-active");
+  try {
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen();
+    }
+  } catch {
+    document.body.classList.add("fullscreen-unavailable");
+  }
+}
+
+async function exitExperience() {
+  document.body.classList.remove("experience-active");
+  try {
+    if (document.fullscreenElement && document.exitFullscreen) {
+      await document.exitFullscreen();
+    }
+  } catch {
+    document.body.classList.remove("experience-active");
+  }
+}
+
+function hydrateCookieBanner() {
+  if (localStorage.getItem("stereolove_cookie_notice") === "accepted") {
+    cookieBanner.hidden = true;
+  }
+}
+
+function acceptCookieNotice() {
+  localStorage.setItem("stereolove_cookie_notice", "accepted");
+  cookieBanner.hidden = true;
 }

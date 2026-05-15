@@ -3,18 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Stereolove is a head-coupled op-art web installation by Sinaida Krivchenko."
+    />
+    <link rel="canonical" href="https://sinaida-space.github.io/stereolove/" />
     <title>Stereolove</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <header class="site-header" aria-label="Site navigation">
+      <a class="brand" href="./" aria-label="Stereolove home">
+        <span>Stereolove</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a href="#instructions">How it works</a>
+        <a href="./privacy.html">Privacy</a>
+        <a href="https://sinaida.eu/" rel="author external">Sinaida.eu</a>
+      </nav>
+    </header>
+
     <main id="app">
       <canvas id="stage" aria-label="Interactive head-coupled perspective artwork"></canvas>
 
-      <section class="panel" aria-label="Artwork controls">
+      <section id="instructions" class="panel" aria-label="Artwork controls and instructions">
         <div class="title">
           <span class="kicker">head-coupled op art</span>
           <h1>Stereolove</h1>
         </div>
+
+        <p class="intro">
+          Treat the monitor as a window into a deep box. Move your head, or move the pointer, to
+          reveal questions on the tunnel walls.
+        </p>
 
         <div class="status-row">
           <span id="statusDot" class="status-dot idle"></span>
@@ -24,6 +45,9 @@
         <div class="actions">
           <button id="cameraButton" type="button">Start camera</button>
           <button id="calibrateButton" type="button">Calibrate</button>
+          <button id="experienceButton" class="primary-action" type="button">
+            Enter experience
+          </button>
         </div>
 
         <label class="control">
@@ -43,8 +67,28 @@
         </div>
       </section>
 
+      <div class="experience-toolbar" aria-label="Experience controls">
+        <button id="exitExperienceButton" type="button">Exit</button>
+      </div>
+
       <video id="webcam" playsinline muted></video>
     </main>
+
+    <aside id="cookieBanner" class="cookie-banner" aria-label="Cookie notice">
+      <p>
+        This site uses only essential local storage to remember this notice. Camera processing runs
+        in your browser when enabled.
+      </p>
+      <div class="cookie-actions">
+        <a href="./privacy.html">Privacy policy</a>
+        <button id="cookieAcceptButton" type="button">Accept</button>
+      </div>
+    </aside>
+
+    <footer class="site-footer">
+      <span>All rights reserved.</span>
+      <a href="https://sinaida.eu/" rel="author external">sinaida.eu</a>
+    </footer>
 
     <script type="module" src="/src/main.js"></script>
   </body>

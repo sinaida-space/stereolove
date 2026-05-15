@@ -8,6 +8,7 @@
   --cyan: #5ef2ff;
   --gold: #f0c35b;
   --panel: rgba(10, 12, 15, 0.72);
+  --panel-solid: rgba(10, 12, 15, 0.9);
 }
 
 * {
@@ -32,9 +33,71 @@ body,
     sans-serif;
 }
 
+a {
+  color: inherit;
+}
+
 button,
 input {
   font: inherit;
+}
+
+.site-header {
+  position: fixed;
+  z-index: 8;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--ink);
+  pointer-events: none;
+}
+
+.brand,
+.site-nav,
+.site-footer,
+.cookie-banner,
+.experience-toolbar,
+.panel {
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.brand {
+  pointer-events: auto;
+  text-decoration: none;
+  font-size: 17px;
+  font-weight: 760;
+}
+
+.site-nav {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(10, 12, 15, 0.62);
+  backdrop-filter: blur(18px);
+}
+
+.site-nav a {
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: rgba(245, 241, 232, 0.78);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.site-nav a:hover,
+.site-nav a[aria-current="page"] {
+  color: var(--ink);
+  background: rgba(245, 241, 232, 0.09);
 }
 
 #stage {
@@ -49,6 +112,7 @@ input {
 
 .panel {
   position: fixed;
+  z-index: 6;
   left: clamp(14px, 2.2vw, 28px);
   bottom: clamp(14px, 2.2vw, 28px);
   width: min(360px, calc(100vw - 28px));
@@ -59,6 +123,13 @@ input {
   color: var(--ink);
   backdrop-filter: blur(18px);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+}
+
+.intro {
+  margin: 12px 0 0;
+  color: rgba(245, 241, 232, 0.72);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .title {
@@ -112,6 +183,12 @@ h1 {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-top: 16px;
+}
+
+.primary-action {
+  grid-column: 1 / -1;
+  border-color: rgba(94, 242, 255, 0.42);
+  background: rgba(94, 242, 255, 0.15);
 }
 
 button {
@@ -184,7 +261,179 @@ body.camera-on #webcam {
   opacity: 0.38;
 }
 
+.experience-toolbar {
+  position: fixed;
+  z-index: 9;
+  top: 12px;
+  right: 12px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.experience-toolbar button {
+  min-width: 72px;
+  min-height: 36px;
+  background: rgba(5, 6, 9, 0.72);
+  backdrop-filter: blur(12px);
+}
+
+.site-footer {
+  position: fixed;
+  z-index: 7;
+  right: 18px;
+  bottom: 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: rgba(245, 241, 232, 0.66);
+  font-size: 12px;
+  pointer-events: auto;
+}
+
+.site-footer a {
+  color: var(--cyan);
+  text-decoration: none;
+}
+
+.cookie-banner {
+  position: fixed;
+  z-index: 10;
+  right: 18px;
+  bottom: 44px;
+  width: min(420px, calc(100vw - 36px));
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-solid);
+  color: var(--ink);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+}
+
+.cookie-banner[hidden] {
+  display: none;
+}
+
+.cookie-banner p {
+  margin: 0;
+  color: rgba(245, 241, 232, 0.76);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.cookie-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.cookie-actions a {
+  color: var(--cyan);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.cookie-actions button {
+  min-width: 96px;
+  min-height: 34px;
+}
+
+body.experience-active {
+  cursor: none;
+}
+
+body.experience-active .site-header,
+body.experience-active .site-footer,
+body.experience-active .panel,
+body.experience-active .cookie-banner {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+}
+
+body.experience-active .experience-toolbar {
+  opacity: 0.34;
+  pointer-events: auto;
+}
+
+body.experience-active .experience-toolbar:hover,
+body.fullscreen-unavailable .experience-toolbar {
+  opacity: 1;
+}
+
+.privacy-page {
+  min-height: 100%;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(94, 242, 255, 0.09), transparent 28rem),
+    radial-gradient(circle at 80% 20%, rgba(184, 121, 255, 0.12), transparent 30rem), var(--bg);
+  color: var(--ink);
+}
+
+.site-header.static {
+  position: sticky;
+  top: 0;
+  padding: 16px;
+  left: auto;
+  right: auto;
+  background: rgba(7, 8, 10, 0.78);
+  backdrop-filter: blur(18px);
+}
+
+.legal-page {
+  width: min(840px, calc(100vw - 32px));
+  margin: 70px auto 80px;
+  color: var(--ink);
+}
+
+.legal-page h1 {
+  font-size: clamp(36px, 7vw, 68px);
+}
+
+.legal-page h2 {
+  margin: 34px 0 8px;
+  font-size: 18px;
+}
+
+.legal-page p {
+  color: rgba(245, 241, 232, 0.76);
+  line-height: 1.65;
+}
+
+.legal-page a {
+  color: var(--cyan);
+}
+
+.legal-date {
+  margin-top: 10px;
+  color: var(--muted);
+}
+
+.site-footer.static {
+  position: static;
+  justify-content: center;
+  padding: 0 16px 30px;
+}
+
 @media (max-width: 720px) {
+  .site-header {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    align-items: flex-start;
+  }
+
+  .site-nav {
+    gap: 2px;
+  }
+
+  .site-nav a {
+    padding: 7px 6px;
+    font-size: 11px;
+  }
+
   .panel {
     left: 8px;
     right: auto;
@@ -222,5 +471,27 @@ body.camera-on #webcam {
 
   #webcam {
     display: none;
+  }
+
+  .site-footer {
+    left: 10px;
+    right: 10px;
+    justify-content: center;
+    bottom: 6px;
+  }
+
+  .cookie-banner {
+    left: 8px;
+    right: 8px;
+    bottom: 34px;
+    width: auto;
+  }
+
+  .cookie-actions {
+    justify-content: space-between;
+  }
+
+  body.experience-active .experience-toolbar {
+    opacity: 0.58;
   }
 }
