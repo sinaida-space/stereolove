@@ -1,4 +1,5 @@
 import { DEFAULT_EYE } from "./config.js";
+import { createAudioController } from "./audio.js";
 import { createFaceTracker, extractFaceMeasurement } from "./face-tracking.js";
 import { createScene, drawScene } from "./scene.js";
 import { deriveFaceEye, derivePointerEye, lerp, makeScreen } from "./projection.js";
@@ -36,16 +37,21 @@ let previousFrameTime = startTime;
 let questionIndex = 0;
 let motionStability = 0;
 let readingHold = 0;
+let readingGrace = 0;
+let revealFlash = 0;
+let readingCaptured = false;
 
 const pointer = { x: 0, y: 0 };
 const eye = { ...DEFAULT_EYE };
 const targetEye = { ...DEFAULT_EYE };
 const previousEye = { ...DEFAULT_EYE };
 const neutralFace = { x: 0.5, y: 0.48, eyeSep: 0.17, ready: false };
+const audio = createAudioController();
 
 resize();
 scene = createScene(screen);
 hydrateCookieBanner();
+hydrateQaMode();
 animate();
 
 cameraButton.addEventListener("click", () => {
@@ -59,6 +65,7 @@ pointerButton.addEventListener("click", () => {
   pointer.y = 0;
   Object.assign(targetEye, DEFAULT_EYE);
   setStatus("Pointer navigation", "idle");
+  audio.start();
   enterExperience();
 });
 
@@ -68,6 +75,7 @@ touchButton.addEventListener("click", () => {
   pointer.y = 0;
   Object.assign(targetEye, DEFAULT_EYE);
   setStatus("Touch navigation", "idle");
+  audio.start();
   enterExperience();
 });
 
@@ -136,6 +144,7 @@ async function startCamera({ enterOnReady = false } = {}) {
     document.body.classList.add("camera-on");
     cameraButton.textContent = "Stop camera";
     setStatus("Looking for face", "idle");
+    audio.start();
     if (enterOnReady) enterExperience();
   } catch (error) {
     cameraMode = false;
@@ -174,6 +183,7 @@ function animate() {
   eye.z = lerp(eye.z, targetEye.z, follow);
 
   updateReadingState(dt);
+  revealFlash = Math.max(0, revealFlash - dt * 0.82);
 
   drawScene(ctx, scene, {
     viewport,
@@ -185,6 +195,8 @@ function animate() {
     questionIndex,
     stability: motionStability,
     readingHold,
+    readingGrace,
+    revealFlash,
   });
   updateReadout();
 }
@@ -255,13 +267,29 @@ function updateReadingState(dt) {
     (eye.z - previousEye.z) * 0.34,
   );
   const speed = distance / Math.max(dt, 0.001);
-  const aligned = 1 - Math.min(1, Math.hypot(eye.x * 0.95, eye.y * 1.35));
-  const stableTarget = speed < 0.08 ? 1 : 0;
+  const aligned = 1 - Math.min(1, Math.hypot(eye.x * 0.72, eye.y * 1.02));
+  const stableTarget = speed < 0.14 ? 1 : 0;
+  const previousHold = readingHold;
 
   motionStability = lerp(motionStability, stableTarget, 1 - Math.exp(-dt * 4.2));
-  const lockTarget = aligned > 0.72 && motionStability > 0.62 ? 1 : 0;
-  const rate = lockTarget ? 0.55 : -1.05;
+  const lockTarget = aligned > 0.48 && motionStability > 0.48 ? 1 : 0;
+  const rate = lockTarget ? 0.92 : readingGrace > 0 ? -0.12 : -0.74;
   readingHold = Math.min(1, Math.max(0, readingHold + dt * rate));
+
+  if (readingHold > 0.72 && previousHold <= 0.72 && !readingCaptured) {
+    readingGrace = 3;
+    revealFlash = 1;
+    readingCaptured = true;
+    audio.playReveal();
+    setStatus("Question resolved", "live");
+  }
+
+  if (readingGrace > 0) {
+    readingGrace = Math.max(0, readingGrace - dt);
+    readingHold = Math.max(readingHold, 0.78);
+  }
+
+  if (readingHold < 0.18) readingCaptured = false;
 
   previousEye.x = eye.x;
   previousEye.y = eye.y;
@@ -275,7 +303,11 @@ function nextQuestion() {
   pointer.y = 0;
   Object.assign(targetEye, DEFAULT_EYE);
   readingHold = 0;
+  readingGrace = 0;
+  revealFlash = 0;
+  readingCaptured = false;
   motionStability = 0;
+  audio.playNext();
   setStatus("Next question", "live");
 }
 
@@ -307,6 +339,20 @@ function hydrateCookieBanner() {
   if (localStorage.getItem("stereolove_cookie_notice") === "accepted") {
     cookieBanner.hidden = true;
   }
+}
+
+function hydrateQaMode() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("qa") !== "experience") return;
+
+  pointer.x = 0;
+  pointer.y = 0;
+  Object.assign(targetEye, DEFAULT_EYE);
+  document.body.classList.add("experience-active");
+  document.querySelector("#instructions").hidden = true;
+  document.querySelector(".site-header").hidden = true;
+  document.querySelector(".site-footer").hidden = true;
+  setStatus("Pointer navigation", "idle");
 }
 
 function acceptCookieNotice() {

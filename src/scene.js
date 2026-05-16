@@ -3,6 +3,7 @@ import { clamp, projectPoint, rotate2 } from "./projection.js";
 import { QUESTIONS } from "./questions.js";
 
 const TUNNEL_DEPTH = -17.5;
+const STAR_DEPTH = 17.8;
 
 export function createScene(screen, random = Math.random) {
   const frames = createFrames(screen, random);
@@ -45,6 +46,7 @@ export function createFrames(screen, random = Math.random) {
       opacity: 0.1 + (1 - depth) * 0.24 + (i % 5 === 0 ? 0.14 : 0),
       color: [PALETTE.ink, PALETTE.cyan, PALETTE.gold, PALETTE.violet, PALETTE.green][i % 5],
       facet: i % 3,
+      near: 1 - depth,
     };
   });
 }
@@ -78,8 +80,8 @@ function createField(screen, random) {
     PALETTE.green,
   ];
 
-  return Array.from({ length: 7600 }, (_, i) => {
-    const z = -0.55 - random() * 17.8;
+  return Array.from({ length: 6400 }, (_, i) => {
+    const z = -0.55 - random() * STAR_DEPTH;
     const angle = random() * Math.PI * 2;
     const shell = Math.pow(random(), 0.28);
     const core = random() < 0.18;
@@ -90,8 +92,11 @@ function createField(screen, random) {
       x: Math.cos(angle) * radiusX + (random() - 0.5) * screen.width * 0.05,
       y: Math.sin(angle) * radiusY + (random() - 0.5) * screen.height * 0.05,
       z,
-      size: core ? 0.45 + random() * 0.9 : 0.6 + random() * 1.9,
-      halo: random() < 0.22 ? 1.6 + random() * 3.4 : 0,
+      size: core ? 0.42 + random() * 0.78 : 0.52 + random() * 1.55,
+      halo: random() < 0.18 ? 1.5 + random() * 3.1 : 0,
+      speed: core ? 0.028 + random() * 0.024 : 0.045 + random() * 0.07,
+      phase: random(),
+      trail: 0.025 + random() * 0.055,
       color: palette[(i + Math.floor(random() * palette.length)) % palette.length],
     };
   });
@@ -139,8 +144,8 @@ export function anamorphicPointForView(screenPoint, z, revealEye) {
 }
 
 function createAnamorphicQuestionPoints(samples, question, screen, random) {
-  const width = screen.width * 1.12;
-  const height = screen.height * 0.54;
+  const width = screen.width * 0.86;
+  const height = screen.height * 0.72;
 
   return samples.map((sample, index) => {
     const rotated = rotate2(sample.x * width, sample.y * height, question.rot);
@@ -162,18 +167,18 @@ function createAnamorphicQuestionPoints(samples, question, screen, random) {
 
 function sampleQuestionPoints(text, random) {
   const canvas = document.createElement("canvas");
-  canvas.width = 1100;
-  canvas.height = 340;
+  canvas.width = 980;
+  canvas.height = 440;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "#fff";
-  ctx.font = '760 48px "Avenir Next", "Helvetica Neue", Arial, sans-serif';
+  ctx.font = '760 50px "Avenir Next", "Helvetica Neue", Arial, sans-serif';
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  const lines = wrapCanvasText(ctx, text.toUpperCase(), 940);
-  const lineHeight = 55;
+  const lines = wrapCanvasText(ctx, text.toUpperCase(), 660);
+  const lineHeight = 58;
   const startY = canvas.height / 2 - ((lines.length - 1) * lineHeight) / 2;
   lines.forEach((line, index) => ctx.fillText(line, canvas.width / 2, startY + index * lineHeight));
 
@@ -191,12 +196,13 @@ function sampleQuestionPoints(text, random) {
     }
   }
 
-  return shuffle(candidates, random).slice(0, 960);
+  return shuffle(candidates, random).slice(0, 1080);
 }
 
 function drawVoid(ctx, state) {
   const { viewport } = state;
   const vanishing = vanishingPoint(state);
+  const flash = state.revealFlash ?? 0;
 
   ctx.fillStyle = PALETTE.background;
   ctx.fillRect(0, 0, viewport.width, viewport.height);
@@ -209,39 +215,43 @@ function drawVoid(ctx, state) {
     vanishing.y,
     viewport.height * 0.92,
   );
-  glow.addColorStop(0, "rgba(245, 241, 232, 0.15)");
-  glow.addColorStop(0.18, "rgba(94, 242, 255, 0.08)");
-  glow.addColorStop(0.46, "rgba(184, 121, 255, 0.04)");
+  glow.addColorStop(0, `rgba(245, 241, 232, ${0.15 + flash * 0.12})`);
+  glow.addColorStop(0.18, `rgba(94, 242, 255, ${0.08 + flash * 0.06})`);
+  glow.addColorStop(0.46, `rgba(184, 121, 255, ${0.04 + flash * 0.05})`);
   glow.addColorStop(1, "rgba(5, 6, 9, 0)");
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, viewport.width, viewport.height);
 }
 
 function drawStarField(ctx, points, state) {
-  const { depth, eye, screen, viewport, dpr } = state;
+  const { depth, eye, screen, viewport, dpr, time } = state;
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
 
   for (const point of points) {
-    const projected = projectPoint(
-      {
-        x: point.x,
-        y: point.y,
-        z: point.z * depth,
-      },
-      eye,
-      screen,
-      viewport,
-      dpr,
-    );
+    const progress = (point.phase + time * point.speed) % 1;
+    const current = starPosition(point, progress, depth);
+    const previous = starPosition(point, Math.max(0, progress - point.trail), depth);
+    const projected = projectPoint(current, eye, screen, viewport, dpr);
     if (!projected.visible) continue;
 
-    const alpha = clamp(0.08 + projected.depth * 0.54, 0.07, 0.58);
-    const radius = clamp(point.size * projected.scale, 0.45, 3.4);
+    const near = smoothstep(0.18, 0.96, progress);
+    const alpha = clamp(0.08 + near * 0.62 + projected.depth * 0.16, 0.06, 0.72);
+    const radius = clamp(point.size * projected.scale * (0.7 + near * 1.15), 0.42, 4.5);
+
+    const trail = projectPoint(previous, eye, screen, viewport, dpr);
+    if (trail.visible && near > 0.08) {
+      ctx.strokeStyle = `rgba(${point.color}, ${alpha * 0.12})`;
+      ctx.lineWidth = clamp(radius * 0.42, 0.25, 1.6);
+      ctx.beginPath();
+      ctx.moveTo(trail.x, trail.y);
+      ctx.lineTo(projected.x, projected.y);
+      ctx.stroke();
+    }
 
     if (point.halo) {
-      ctx.fillStyle = `rgba(${point.color}, ${alpha * 0.06})`;
+      ctx.fillStyle = `rgba(${point.color}, ${alpha * (0.04 + near * 0.05)})`;
       ctx.beginPath();
       ctx.arc(projected.x, projected.y, radius * point.halo * dpr, 0, Math.PI * 2);
       ctx.fill();
@@ -254,6 +264,15 @@ function drawStarField(ctx, points, state) {
   }
 
   ctx.restore();
+}
+
+function starPosition(point, progress, depth) {
+  const eased = Math.pow(progress, 1.45);
+  return {
+    x: point.x * (0.34 + eased * 0.88),
+    y: point.y * (0.34 + eased * 0.88),
+    z: (-0.5 - (1 - eased) * STAR_DEPTH) * depth,
+  };
 }
 
 function drawTunnel(ctx, scene, state) {
@@ -276,7 +295,8 @@ function drawFrames(ctx, frames, state, widthScale = 1, alphaScale = 1) {
   for (const frame of frames) {
     const z = frame.z * depth;
     const corners = framePoints(frame, z);
-    const lineWidth = (frame.facet === 0 ? 1.1 : 0.62) * widthScale;
+    const nearGlow = 0.45 + frame.near * 1.65;
+    const lineWidth = (frame.facet === 0 ? 1.08 : 0.58) * widthScale * nearGlow;
 
     for (let i = 0; i < corners.length; i += 1) {
       drawWorldLine(
@@ -285,7 +305,7 @@ function drawFrames(ctx, frames, state, widthScale = 1, alphaScale = 1) {
         corners[(i + 1) % corners.length],
         state,
         frame.color,
-        frame.opacity * alphaScale,
+        frame.opacity * alphaScale * nearGlow,
         lineWidth,
       );
     }
@@ -352,14 +372,15 @@ function drawQuestionConstellation(ctx, question, state) {
   const { depth, eye, screen, viewport, dpr } = state;
   const reveal = activeReveal(question, eye);
   const lock = state.readingHold ?? 0;
+  const grace = state.readingGrace > 0 ? 1 : 0;
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
 
   for (const pass of [
-    { alpha: 0.1, scale: 6.8 },
-    { alpha: 0.24, scale: 3.1 },
-    { alpha: 0.78, scale: 1 },
+    { alpha: 0.08, scale: 5.4 },
+    { alpha: 0.19, scale: 2.4 },
+    { alpha: 0.62, scale: 0.86 },
   ]) {
     for (const dot of question.points) {
       const color = dot.colorShift % 3 === 0 ? PALETTE.ink : question.color;
@@ -376,13 +397,20 @@ function drawQuestionConstellation(ctx, question, state) {
       );
       if (!projected.visible) continue;
 
-      const lockFocus = 1 - lock * 0.48;
+      const lockFocus = 1 - lock * 0.9;
+      const holdFade = 1 - lock * 0.84;
       const size = clamp(
-        dot.size * projected.scale * (1.16 + reveal * 2.8) * pass.scale * lockFocus,
-        0.5,
-        9.2,
+        dot.size *
+          projected.scale *
+          (1.16 + Math.max(reveal, grace * 0.86) * 2.8) *
+          pass.scale *
+          lockFocus,
+        0.28,
+        lock > 0.56 ? 2.8 : 7.4,
       );
-      ctx.fillStyle = `rgba(${color}, ${pass.alpha * (0.36 + reveal) * (1 - lock * 0.2)})`;
+      ctx.fillStyle = `rgba(${color}, ${
+        pass.alpha * (0.36 + Math.max(reveal, grace * 0.72)) * holdFade
+      })`;
       ctx.beginPath();
       ctx.arc(projected.x, projected.y, size, 0, Math.PI * 2);
       ctx.fill();
@@ -408,13 +436,14 @@ function drawQuestionLock(ctx, question, state) {
   );
   if (!anchor.visible) return;
 
-  const reveal = activeReveal(question, eye);
-  const alpha = smoothstep(0.12, 0.72, lock) * reveal;
+  const reveal = Math.max(activeReveal(question, eye), state.readingGrace > 0 ? 0.92 : 0);
+  const flash = state.revealFlash ?? 0;
+  const alpha = smoothstep(0.08, 0.56, lock) * reveal;
   if (alpha <= 0.01) return;
 
-  const fontSize = clamp(anchor.scale * 88, 24 * dpr, 58 * dpr);
-  const lineHeight = fontSize * 1.08;
-  const maxWidth = Math.min(viewport.width * 0.84, 960 * dpr);
+  const fontSize = clamp(anchor.scale * 92, 23 * dpr, 54 * dpr);
+  const lineHeight = fontSize * 1.04;
+  const maxWidth = Math.min(viewport.width * 0.62, 720 * dpr);
   const totalHeight = (question.lines.length - 1) * lineHeight;
 
   ctx.save();
@@ -429,16 +458,23 @@ function drawQuestionLock(ctx, question, state) {
     const y = index * lineHeight - totalHeight / 2;
     const text = line.toUpperCase();
 
-    ctx.lineWidth = Math.max(1.2, 3.2 * dpr);
-    ctx.strokeStyle = `rgba(${question.color}, ${0.16 * alpha})`;
-    ctx.shadowColor = `rgba(${question.color}, ${0.75 * alpha})`;
-    ctx.shadowBlur = 20 * dpr;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.lineWidth = Math.max(1.6, 6.8 * dpr);
+    ctx.strokeStyle = `rgba(5, 6, 9, ${0.62 * alpha})`;
+    ctx.shadowBlur = 0;
     ctx.strokeText(text, 0, y, maxWidth);
 
-    ctx.lineWidth = Math.max(0.65, 0.88 * dpr);
-    ctx.strokeStyle = `rgba(245, 241, 232, ${0.94 * alpha})`;
-    ctx.shadowColor = `rgba(245, 241, 232, ${0.48 * alpha})`;
-    ctx.shadowBlur = 6 * dpr;
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineWidth = Math.max(1.2, 4.4 * dpr);
+    ctx.strokeStyle = `rgba(${question.color}, ${(0.22 + flash * 0.1) * alpha})`;
+    ctx.shadowColor = `rgba(${question.color}, ${(0.82 + flash * 0.26) * alpha})`;
+    ctx.shadowBlur = (22 + flash * 14) * dpr;
+    ctx.strokeText(text, 0, y, maxWidth);
+
+    ctx.lineWidth = Math.max(0.82, 1.22 * dpr);
+    ctx.strokeStyle = `rgba(245, 241, 232, ${Math.min(1, (0.98 + flash * 0.18) * alpha)})`;
+    ctx.shadowColor = `rgba(245, 241, 232, ${(0.52 + flash * 0.16) * alpha})`;
+    ctx.shadowBlur = (6 + flash * 4) * dpr;
     ctx.strokeText(text, 0, y, maxWidth);
   });
 
@@ -473,12 +509,23 @@ function drawWorldLine(ctx, a, b, state, color, alpha, lineWidth = 1) {
   const pb = projectPoint(b, eye, screen, viewport, dpr);
   if (!pa.visible && !pb.visible) return;
 
-  ctx.strokeStyle = `rgba(${color}, ${alpha})`;
-  ctx.lineWidth = lineWidth * dpr;
+  const scale = clamp((pa.scale + pb.scale) * 0.5, 0.05, 1.25);
+  const edgeLight = clamp(
+    Math.max(distanceFromCenter(pa, viewport), distanceFromCenter(pb, viewport)),
+    0,
+    1,
+  );
+  const headLight = clamp(1 + Math.hypot(state.eye.x, state.eye.y) * 0.08, 1, 1.18);
+  ctx.strokeStyle = `rgba(${color}, ${clamp(alpha * (0.72 + edgeLight * 0.65) * headLight, 0, 0.86)})`;
+  ctx.lineWidth = clamp(lineWidth * dpr * (0.56 + scale * 1.25 + edgeLight * 0.38), 0.18, 6.5);
   ctx.beginPath();
   ctx.moveTo(pa.x, pa.y);
   ctx.lineTo(pb.x, pb.y);
   ctx.stroke();
+}
+
+function distanceFromCenter(point, viewport) {
+  return Math.hypot(point.x / viewport.width - 0.5, point.y / viewport.height - 0.5) * 1.72;
 }
 
 function vanishingPoint(state) {
@@ -500,7 +547,7 @@ function vanishingPoint(state) {
 
 function activeReveal(question, eye) {
   const gaze = clamp(
-    1 - Math.hypot((question.revealEye.x - eye.x) * 0.78, (question.revealEye.y - eye.y) * 1.15),
+    1 - Math.hypot((question.revealEye.x - eye.x) * 0.52, (question.revealEye.y - eye.y) * 0.82),
     0,
     1,
   );
@@ -516,7 +563,7 @@ function wrapQuestion(text) {
   const words = text.split(" ");
   const lines = [];
   let line = "";
-  const maxChars = 26;
+  const maxChars = 18;
 
   for (const word of words) {
     const test = line ? `${line} ${word}` : word;

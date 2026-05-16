@@ -6,7 +6,7 @@ Stereolove is a browser-based perceptual artwork about the instability of realit
 
 This project reverses that relationship. Instead of asking the viewer to adapt to a fixed illusion, the illusion adapts to the viewer. A webcam, mouse, or touch input changes the image as if the monitor were a window into a responsive optical volume.
 
-The current direction treats the monitor as glass over a luminous perceptual field. Behind the screen is a star tube made from centered rings, perspective spokes, retinal point clouds, and one active anamorphic question at a time. The question is made from dots distributed through depth; it becomes language from the reveal viewpoint and dissolves back into scattered light as the viewer moves.
+The current direction treats the monitor as glass over a luminous perceptual field. Behind the screen is a star tube made from centered rings, perspective spokes, outward-flowing retinal point clouds, and one active anamorphic question at a time. The question is made from dots distributed through depth; it becomes language from the reveal viewpoint and dissolves back into scattered light as the viewer moves.
 
 ## Visual Language
 
@@ -15,9 +15,9 @@ The work uses a psychedelic geometric language inspired by op art, moire interfe
 - a screen-aligned aperture frames the monitor as glass,
 - centered wireframe rings create a stable vanishing point when the viewer faces the screen,
 - perspective spokes shift by off-axis projection when the viewer moves,
-- star fields and tiny halos make the volume feel suspended in space,
+- star fields and tiny halos move outward from the vanishing point to create a slow flight sensation,
 - colored point clouds create peripheral instability,
-- question text appears only as a dot-typography constellation, with glow and light scatter replacing ordinary text rendering.
+- question text appears first as a dot-typography constellation, then resolves into a thin glowing outline with a soft flash and small audio cue when the viewer finds the reading position.
 
 The visual system should feel precise rather than decorative. It is about cognition, not wallpaper: the artwork asks how much of reality is in the object and how much is constructed by the observer.
 
@@ -29,9 +29,9 @@ The work begins with an onboarding screen that frames the piece as an expanded-s
 - Mouse mode uses pointer position to simulate head movement.
 - Touch mode uses touch position for mobile and tablet navigation.
 
-Looking left, right, up, or down changes the virtual eye position. The tunnel geometry and question constellation shift with motion parallax, making the flat screen behave like a volume that reacts to attention. The scene avoids autonomous animation: if the viewer is still, the space stays still, and only the reading state can settle into a clearer glowing prompt.
+Looking left, right, up, or down changes the virtual eye position. The tunnel geometry and question constellation shift with motion parallax, making the flat screen behave like a volume that reacts to attention. The fixed structure stays calm while the star field moves through depth, so the sensation is closer to looking into a moving volume than watching a rotating graphic.
 
-Camera mode treats the first stable face position as neutral. Optional tuning allows the viewer to recenter the view and adjust depth or sensitivity before entering again. Questions change only when the viewer asks for the next one, so the work can pause long enough for reading and reflection.
+Camera mode treats the first stable face position as neutral. Optional tuning allows the viewer to recenter the view and adjust depth or sensitivity before entering again. Questions change only when the viewer asks for the next one. Once a question resolves, it remains readable for at least three seconds so the viewer can pause with it before moving on.
 
 ## Theme
 
