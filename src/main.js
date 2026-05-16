@@ -9,8 +9,9 @@ const video = document.querySelector("#webcam");
 const statusDot = document.querySelector("#statusDot");
 const statusText = document.querySelector("#statusText");
 const cameraButton = document.querySelector("#cameraButton");
+const pointerButton = document.querySelector("#pointerButton");
+const touchButton = document.querySelector("#touchButton");
 const calibrateButton = document.querySelector("#calibrateButton");
-const experienceButton = document.querySelector("#experienceButton");
 const exitExperienceButton = document.querySelector("#exitExperienceButton");
 const cookieBanner = document.querySelector("#cookieBanner");
 const cookieAcceptButton = document.querySelector("#cookieAcceptButton");
@@ -43,7 +44,22 @@ animate();
 
 cameraButton.addEventListener("click", () => {
   if (cameraMode) stopCamera();
-  else startCamera();
+  else startCamera({ enterOnReady: true });
+});
+
+pointerButton.addEventListener("click", () => {
+  if (cameraMode) stopCamera();
+  setStatus("Pointer navigation", "idle");
+  enterExperience();
+});
+
+touchButton.addEventListener("click", () => {
+  if (cameraMode) stopCamera();
+  pointer.x = 0;
+  pointer.y = 0;
+  Object.assign(targetEye, DEFAULT_EYE);
+  setStatus("Touch navigation", "idle");
+  enterExperience();
 });
 
 calibrateButton.addEventListener("click", () => {
@@ -62,7 +78,6 @@ calibrateButton.addEventListener("click", () => {
   setStatus(cameraMode ? "Looking for face" : "Pointer centered", "idle");
 });
 
-experienceButton.addEventListener("click", enterExperience);
 exitExperienceButton.addEventListener("click", exitExperience);
 cookieAcceptButton.addEventListener("click", acceptCookieNotice);
 
@@ -76,9 +91,12 @@ window.addEventListener("keydown", (event) => {
 
 window.addEventListener("pointermove", (event) => {
   if (cameraMode) return;
-  pointer.x = (event.clientX / window.innerWidth - 0.5) * 2;
-  pointer.y = -(event.clientY / window.innerHeight - 0.5) * 2;
-  Object.assign(targetEye, derivePointerEye(pointer, Number(sensitivitySlider.value)));
+  updatePointerEye(event);
+});
+
+window.addEventListener("pointerdown", (event) => {
+  if (cameraMode) return;
+  updatePointerEye(event);
 });
 
 window.addEventListener("pointerleave", () => {
@@ -90,7 +108,7 @@ window.addEventListener("resize", () => {
   scene = createScene(screen);
 });
 
-async function startCamera() {
+async function startCamera({ enterOnReady = false } = {}) {
   setStatus("Loading face model", "idle");
 
   try {
@@ -107,9 +125,15 @@ async function startCamera() {
     document.body.classList.add("camera-on");
     cameraButton.textContent = "Stop camera";
     setStatus("Looking for face", "idle");
+    if (enterOnReady) enterExperience();
   } catch (error) {
     cameraMode = false;
-    setStatus(error.name === "NotAllowedError" ? "Camera blocked" : "Camera unavailable", "error");
+    setStatus(
+      error.name === "NotAllowedError"
+        ? "Camera blocked. Use mouse or touch."
+        : "Camera unavailable",
+      "error",
+    );
     console.error(error);
   }
 }
@@ -120,8 +144,8 @@ function stopCamera() {
   cameraMode = false;
   lastFace = null;
   document.body.classList.remove("camera-on");
-  cameraButton.textContent = "Start camera";
-  setStatus("Pointer mode", "idle");
+  cameraButton.textContent = "Use camera";
+  setStatus("Choose a mode to enter", "idle");
 }
 
 function animate() {
@@ -197,7 +221,14 @@ function updateReadout() {
   zReadout.textContent = `z ${eye.z.toFixed(2)}`;
 }
 
+function updatePointerEye(event) {
+  pointer.x = (event.clientX / window.innerWidth - 0.5) * 2;
+  pointer.y = -(event.clientY / window.innerHeight - 0.5) * 2;
+  Object.assign(targetEye, derivePointerEye(pointer, Number(sensitivitySlider.value)));
+}
+
 async function enterExperience() {
+  document.body.classList.remove("fullscreen-unavailable");
   document.body.classList.add("experience-active");
   try {
     if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
@@ -210,6 +241,7 @@ async function enterExperience() {
 
 async function exitExperience() {
   document.body.classList.remove("experience-active");
+  document.body.classList.remove("fullscreen-unavailable");
   try {
     if (document.fullscreenElement && document.exitFullscreen) {
       await document.exitFullscreen();

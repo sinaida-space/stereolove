@@ -1,6 +1,6 @@
 # Web Audit
 
-Last updated: May 15, 2026.
+Last updated: May 16, 2026.
 
 ## Scope
 
@@ -14,7 +14,8 @@ https://sinaida-space.github.io/stereolove/
 
 - Production deployment uses GitHub Pages over HTTPS.
 - Vite is configured with `base: "/stereolove/"` for correct asset loading on the project URL.
-- The site now includes a persistent header with navigation to instructions, privacy policy, and the main Sinaida website.
+- The site now opens with an onboarding screen that explains the artwork and asks the viewer to choose camera, mouse, or touch navigation.
+- The site includes a persistent header with navigation to instructions, privacy policy, and the main Sinaida website before the artwork enters fullscreen.
 - The site includes a mini footer with an all-rights-reserved notice and a link to `sinaida.eu`.
 - The artwork can enter a full-screen experience mode that hides navigation, footer, cookie notice, and controls.
 - Camera mode is opt-in and starts only after a user gesture.
