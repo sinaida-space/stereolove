@@ -6,17 +6,17 @@ Stereolove is a browser-based perceptual artwork about the instability of realit
 
 This project reverses that relationship. Instead of asking the viewer to adapt to a fixed illusion, the illusion adapts to the viewer. A webcam, mouse, or touch input changes the image as if the monitor were a window into a responsive optical volume.
 
-The current direction treats the monitor as glass over a luminous perceptual field. Behind the screen is a star tube made from centered rings, perspective spokes, outward-flowing retinal point clouds, and one active anamorphic question at a time. The question is made from dots distributed through depth; it becomes language from the reveal viewpoint and dissolves back into scattered light as the viewer moves.
+The current direction treats the monitor as glass over a luminous perceptual field. Behind the screen is a white-to-cyan star tube made from centered rings, perspective spokes, outward-flowing retinal point clouds, and one active anamorphic question at a time. The question is made from brighter cyan dots distributed through depth; it becomes language from the reveal viewpoint and dissolves back into scattered light as the viewer moves.
 
 ## Visual Language
 
 The work uses a psychedelic geometric language inspired by op art, moire interference, retinal afterimages, and fractal symmetry:
 
 - a screen-aligned aperture frames the monitor as glass,
-- centered wireframe rings create a stable vanishing point when the viewer faces the screen,
+- centered rectangular wireframe rings create a stable vanishing point when the viewer faces the screen,
 - perspective spokes shift by off-axis projection when the viewer moves,
-- star fields and tiny halos move outward from the vanishing point to create a slow flight sensation,
-- colored point clouds create peripheral instability,
+- white and pale-cyan star fields move slowly outward from the vanishing point,
+- the question cloud is separated from the background through brighter cyan point tones,
 - question text appears first as a dot-typography constellation, then resolves into a thin glowing outline with a soft flash and small audio cue when the viewer finds the reading position.
 
 The visual system should feel precise rather than decorative. It is about cognition, not wallpaper: the artwork asks how much of reality is in the object and how much is constructed by the observer.
