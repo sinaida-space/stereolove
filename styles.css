@@ -511,6 +511,10 @@ body.experience-active.fullscreen-unavailable .experience-toolbar {
     gap: 2px;
   }
 
+  .site-nav a[href*="sinaida.eu"] {
+    display: none;
+  }
+
   .site-nav a {
     padding: 7px 6px;
     font-size: 11px;
@@ -518,11 +522,13 @@ body.experience-active.fullscreen-unavailable .experience-toolbar {
 
   .panel {
     top: 52%;
-    left: 50%;
-    width: calc(100vw - 16px);
+    left: 8px;
+    right: 8px;
+    width: auto;
     max-width: none;
     max-height: calc(100dvh - 112px);
     padding: 14px;
+    transform: translateY(-50%);
   }
 
   h1 {
@@ -571,10 +577,15 @@ body.experience-active.fullscreen-unavailable .experience-toolbar {
 
   .cookie-actions {
     justify-content: space-between;
+    flex-wrap: wrap;
   }
 
   body.experience-active .experience-toolbar {
     opacity: 0.58;
+  }
+
+  body.experience-active .panel {
+    transform: translateY(-52%);
   }
 }
 
