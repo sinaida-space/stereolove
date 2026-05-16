@@ -4,7 +4,7 @@ Stereolove is a head-coupled op-art installation about perception, perspective, 
 
 The browser estimates the viewer's head position with MediaPipe Face Landmarker and changes the projection so the monitor behaves like an unstable optical volume behind glass. Without a camera, the same effect works with mouse, trackpad, or touch navigation.
 
-The current scene treats the monitor as a portal into a star tube. Rings, perspective spokes, and background stars use a restrained white-to-cyan palette and stay physically organized behind the screen. Small particles drift slowly outward from the vanishing point. One active anamorphic question is built as a brighter cyan point cloud that aligns from the reveal viewpoint and scatters as the viewpoint changes.
+The current scene treats the monitor as a portal into a star tube. Rings, perspective spokes, and background stars use a restrained white-to-cyan palette and stay physically organized behind the screen. Small particles drift slowly outward from the vanishing point. One active anamorphic question is built as a brighter cyan point cloud that compresses into text from the reveal viewpoint and scatters into elastic fragments as the viewpoint changes.
 
 ## Live Site
 
