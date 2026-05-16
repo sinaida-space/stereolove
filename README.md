@@ -4,7 +4,7 @@ Stereolove is a head-coupled op-art installation about perception, perspective, 
 
 The browser estimates the viewer's head position with MediaPipe Face Landmarker and changes the projection so the monitor behaves like an unstable optical volume behind glass. Without a camera, the same effect works with mouse, trackpad, or touch navigation.
 
-The current scene avoids a literal room or corridor. It uses floating wireframe panes, retinal point fields, light rays, and one active anamorphic question at a time. The question is not drawn as ordinary text; it is built from 3D points that align from the reveal viewpoint and scatter as the viewpoint changes.
+The current scene treats the monitor as a portal into a star tube. Static rings, perspective spokes, and small glowing particles are projected behind the screen, so the image changes only when the viewer changes position. One active anamorphic question is built from 3D points that align from the reveal viewpoint and scatter as the viewpoint changes.
 
 ## Live Site
 
@@ -16,7 +16,7 @@ https://sinaida-space.github.io/stereolove/
 
 ## Concept
 
-The piece is called **The Reality Negotiator**. It uses psychedelic geometry, op-art line interference, fractal rosettes, and anamorphic text to explore a simple question: what changes when reality is viewed from another position?
+The piece is called **The Reality Negotiator**. It uses psychedelic geometry, op-art line interference, a head-coupled star tunnel, and anamorphic text to explore a simple question: what changes when reality is viewed from another position?
 
 Read the full concept in [docs/CONCEPT.md](docs/CONCEPT.md).
 

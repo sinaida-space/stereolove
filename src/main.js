@@ -168,7 +168,7 @@ function animate() {
 
   if (cameraMode) detectFace(now);
 
-  const follow = 1 - Math.exp(-dt * 5.2);
+  const follow = 1 - Math.exp(-dt * 3.4);
   eye.x = lerp(eye.x, targetEye.x, follow);
   eye.y = lerp(eye.y, targetEye.y, follow);
   eye.z = lerp(eye.z, targetEye.z, follow);

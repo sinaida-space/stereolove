@@ -6,28 +6,26 @@ const screen = { width: 4.8, height: 2.7 };
 const viewport = { width: 1200, height: 675 };
 
 describe("perceptual field geometry", () => {
-  it("builds layered wireframe panes behind the screen", () => {
+  it("builds layered portal frames behind the screen", () => {
     const frames = createFrames(screen, () => 0.5);
 
-    expect(frames.length).toBeGreaterThan(20);
+    expect(frames.length).toBeGreaterThan(30);
     expect(frames[0].z).toBeLessThan(0);
     expect(frames.at(-1).z).toBeLessThan(frames[0].z);
   });
 
-  it("keeps frame layers wider as they recede", () => {
+  it("keeps portal layers centered for physically coherent perspective", () => {
     const frames = createFrames(screen, () => 0.5);
 
-    expect(frames.at(-1).w).toBeGreaterThan(frames[0].w);
-    expect(frames.at(-1).h).toBeGreaterThan(frames[0].h);
+    expect(frames.every((frame) => frame.x === 0 && frame.y === 0)).toBe(true);
+    expect(frames.every((frame) => frame.rot === 0)).toBe(true);
   });
 
-  it("avoids a rigid corridor by drifting and rotating frame layers", () => {
+  it("keeps frame scale nearly constant so depth converges to the screen center", () => {
     const frames = createFrames(screen, () => 0.5);
-    const hasDrift = frames.some((frame) => Math.abs(frame.x) > 0.05 || Math.abs(frame.y) > 0.05);
-    const hasRotation = frames.some((frame) => Math.abs(frame.rot) > 0.1);
 
-    expect(hasDrift).toBe(true);
-    expect(hasRotation).toBe(true);
+    expect(frames.at(-1).w).toBeCloseTo(frames[0].w);
+    expect(frames.at(-1).h).toBeCloseTo(frames[0].h);
   });
 
   it("cycles one active question plane at a time", () => {
