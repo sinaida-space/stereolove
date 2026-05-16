@@ -2,7 +2,7 @@
 
 Stereolove is a head-coupled op-art installation about perception, perspective, and different ways of constructing reality.
 
-The browser estimates the viewer's head position with MediaPipe Face Landmarker and changes the projection so the monitor behaves like a window into a geometric optical chamber. Without a camera, the same effect works in pointer mode with a mouse or trackpad.
+The browser estimates the viewer's head position with MediaPipe Face Landmarker and changes the projection so the monitor behaves like a window into a geometric optical chamber. Without a camera, the same effect works with mouse, trackpad, or touch navigation.
 
 The current scene turns the monitor into the front opening of a deep box. Questions appear as dot typography on the tunnel walls, and the chamber opens toward the viewer's current point of view.
 
@@ -34,10 +34,10 @@ Start the development server:
 npm run dev
 ```
 
-Open:
+Open the local URL printed by Vite. It will include the project base path, for example:
 
 ```text
-http://127.0.0.1:4173
+http://127.0.0.1:4173/stereolove/
 ```
 
 ## Scripts
@@ -56,9 +56,17 @@ npm run check    # lint, test, and build
 
 The site is deployed to GitHub Pages by `.github/workflows/deploy-pages.yml` whenever `main` is updated. Vite is configured with `base: "/stereolove/"` so production assets resolve correctly from the project page path.
 
-## Camera Mode
+## Experience Flow
 
-Camera mode requires `getUserMedia`, which works on `localhost` or HTTPS. Press `Start camera`, allow camera access, then press `Calibrate` when your head is in a neutral viewing position.
+The public page starts with a short onboarding screen. The viewer chooses one of three modes:
+
+- `Use camera` starts camera tracking, then enters the fullscreen artwork.
+- `Use mouse` enters the artwork with pointer-based perspective.
+- `Use touch` enters the artwork with touch-based perspective.
+
+The header, footer, cookie notice, and controls are hidden while the artwork is active. The `Exit` button returns to the onboarding screen.
+
+Camera mode requires `getUserMedia`, which works on `localhost` or HTTPS. Camera processing runs locally in the browser. The first stable face position is treated as neutral, and `Recenter view` is available in optional tuning.
 
 MediaPipe is loaded only when camera mode starts, so the artwork still runs if camera access is blocked.
 

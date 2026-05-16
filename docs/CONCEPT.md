@@ -4,7 +4,7 @@
 
 Stereolove is a browser-based perceptual artwork about the instability of reality under observation. It begins with the emotional premise of stereograms: some viewers can see the hidden depth, some cannot, and the image seems to withhold a world from the viewer.
 
-This project reverses that relationship. Instead of asking the viewer to adapt to a fixed illusion, the illusion adapts to the viewer. A webcam estimates head position, and the image shifts as if the monitor were a window into a responsive optical chamber.
+This project reverses that relationship. Instead of asking the viewer to adapt to a fixed illusion, the illusion adapts to the viewer. A webcam, mouse, or touch input changes the image as if the monitor were a window into a responsive optical chamber.
 
 The current direction treats the monitor as the front opening of a deep box. The edges of the screen become a physical aperture. Behind it are walls, floor, ceiling, and a back plane. As the viewer moves, the planes reveal different questions and appear to unfold, making the flat monitor feel like a spatial object.
 
@@ -23,14 +23,15 @@ The visual system should feel precise rather than decorative. It is about cognit
 
 ## Interaction
 
-There are two modes:
+The work begins with an onboarding screen that frames the piece as an expanded-screen artwork and asks the viewer how the chamber should respond. There are three entry modes:
 
-- Pointer mode uses mouse or trackpad position to simulate head movement.
 - Camera mode uses MediaPipe Face Landmarker to estimate the viewer's face position.
+- Mouse mode uses pointer position to simulate head movement.
+- Touch mode uses touch position for mobile and tablet navigation.
 
 Looking left, right, up, or down changes the virtual eye position. The corresponding wall becomes more legible, and the tunnel opens slightly in that direction.
 
-Camera mode treats the first stable face position as neutral. The viewer can recalibrate at any time.
+Camera mode treats the first stable face position as neutral. Optional tuning allows the viewer to recenter the view and adjust depth or sensitivity before entering again.
 
 ## Theme
 
