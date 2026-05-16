@@ -180,7 +180,7 @@ function animate() {
 
   if (cameraMode) detectFace(now);
 
-  const follow = 1 - Math.exp(-dt * 3.4);
+  const follow = 1 - Math.exp(-dt * 2.25);
   eye.x = lerp(eye.x, targetEye.x, follow);
   eye.y = lerp(eye.y, targetEye.y, follow);
   eye.z = lerp(eye.z, targetEye.z, follow);
@@ -200,6 +200,7 @@ function animate() {
     readingHold,
     readingGrace,
     revealFlash,
+    isCompact: window.innerWidth <= 820,
     eyeMotion: {
       x: motionX,
       y: motionY,
@@ -277,17 +278,18 @@ function updateReadingState(dt) {
   const speed = distance / Math.max(dt, 0.001);
   const instantX = clampMotion((eye.x - previousEye.x) / Math.max(dt, 0.001));
   const instantY = clampMotion((eye.y - previousEye.y) / Math.max(dt, 0.001));
-  const instantStretch = Math.min(1, speed * 2.4);
-  const aligned = 1 - Math.min(1, Math.hypot(eye.x * 0.72, eye.y * 1.02));
-  const stableTarget = speed < 0.14 ? 1 : 0;
+  const isCompact = window.innerWidth <= 820;
+  const instantStretch = Math.min(0.74, speed * (isCompact ? 0.95 : 1.35));
+  const aligned = 1 - Math.min(1, Math.hypot(eye.x * 0.58, eye.y * 0.82));
+  const stableTarget = speed < (isCompact ? 0.2 : 0.16) ? 1 : 0;
   const previousHold = readingHold;
 
-  motionX = lerp(motionX, instantX, 1 - Math.exp(-dt * 7.5));
-  motionY = lerp(motionY, instantY, 1 - Math.exp(-dt * 7.5));
-  motionStretch = lerp(motionStretch, instantStretch, 1 - Math.exp(-dt * 5.5));
-  motionStability = lerp(motionStability, stableTarget, 1 - Math.exp(-dt * 4.2));
-  const lockTarget = aligned > 0.48 && motionStability > 0.48 ? 1 : 0;
-  const rate = lockTarget ? 0.92 : readingGrace > 0 ? -0.12 : -0.74;
+  motionX = lerp(motionX, instantX, 1 - Math.exp(-dt * 4.2));
+  motionY = lerp(motionY, instantY, 1 - Math.exp(-dt * 4.2));
+  motionStretch = lerp(motionStretch, instantStretch, 1 - Math.exp(-dt * 3.4));
+  motionStability = lerp(motionStability, stableTarget, 1 - Math.exp(-dt * 3.4));
+  const lockTarget = aligned > (isCompact ? 0.36 : 0.42) && motionStability > 0.42 ? 1 : 0;
+  const rate = lockTarget ? (isCompact ? 1.08 : 0.86) : readingGrace > 0 ? -0.08 : -0.55;
   readingHold = Math.min(1, Math.max(0, readingHold + dt * rate));
 
   if (readingHold > 0.72 && previousHold <= 0.72 && !readingCaptured) {
@@ -311,7 +313,7 @@ function updateReadingState(dt) {
 }
 
 function clampMotion(value) {
-  return Math.min(1.8, Math.max(-1.8, value));
+  return Math.min(1.15, Math.max(-1.15, value));
 }
 
 function nextQuestion() {
