@@ -40,6 +40,9 @@ let readingHold = 0;
 let readingGrace = 0;
 let revealFlash = 0;
 let readingCaptured = false;
+let motionX = 0;
+let motionY = 0;
+let motionStretch = 0;
 
 const pointer = { x: 0, y: 0 };
 const eye = { ...DEFAULT_EYE };
@@ -197,6 +200,11 @@ function animate() {
     readingHold,
     readingGrace,
     revealFlash,
+    eyeMotion: {
+      x: motionX,
+      y: motionY,
+      stretch: motionStretch,
+    },
   });
   updateReadout();
 }
@@ -267,10 +275,16 @@ function updateReadingState(dt) {
     (eye.z - previousEye.z) * 0.34,
   );
   const speed = distance / Math.max(dt, 0.001);
+  const instantX = clampMotion((eye.x - previousEye.x) / Math.max(dt, 0.001));
+  const instantY = clampMotion((eye.y - previousEye.y) / Math.max(dt, 0.001));
+  const instantStretch = Math.min(1, speed * 2.4);
   const aligned = 1 - Math.min(1, Math.hypot(eye.x * 0.72, eye.y * 1.02));
   const stableTarget = speed < 0.14 ? 1 : 0;
   const previousHold = readingHold;
 
+  motionX = lerp(motionX, instantX, 1 - Math.exp(-dt * 7.5));
+  motionY = lerp(motionY, instantY, 1 - Math.exp(-dt * 7.5));
+  motionStretch = lerp(motionStretch, instantStretch, 1 - Math.exp(-dt * 5.5));
   motionStability = lerp(motionStability, stableTarget, 1 - Math.exp(-dt * 4.2));
   const lockTarget = aligned > 0.48 && motionStability > 0.48 ? 1 : 0;
   const rate = lockTarget ? 0.92 : readingGrace > 0 ? -0.12 : -0.74;
@@ -294,6 +308,10 @@ function updateReadingState(dt) {
   previousEye.x = eye.x;
   previousEye.y = eye.y;
   previousEye.z = eye.z;
+}
+
+function clampMotion(value) {
+  return Math.min(1.8, Math.max(-1.8, value));
 }
 
 function nextQuestion() {

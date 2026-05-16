@@ -165,6 +165,11 @@ function createAnamorphicQuestionPoints(samples, question, screen, random) {
       weight: sample.weight,
       size: 0.82 + random() * 1.45,
       colorShift: index % TEXT_COLORS.length,
+      scatterX: (random() - 0.5) * screen.width * (0.34 + random() * 0.52),
+      scatterY: (random() - 0.5) * screen.height * (0.28 + random() * 0.48),
+      scatterZ: (random() - 0.5) * 4.6,
+      elastic: 0.35 + random() * 1.15,
+      orbit: random() * Math.PI * 2,
     };
   });
 }
@@ -235,8 +240,13 @@ function drawStarField(ctx, points, state) {
 
   for (const point of points) {
     const progress = (point.phase + time * point.speed) % 1;
-    const current = starPosition(point, progress, depth);
-    const previous = starPosition(point, Math.max(0, progress - point.trail), depth);
+    const current = starPosition(point, progress, depth, state.eyeMotion);
+    const previous = starPosition(
+      point,
+      Math.max(0, progress - point.trail),
+      depth,
+      state.eyeMotion,
+    );
     const projected = projectPoint(current, eye, screen, viewport, dpr);
     if (!projected.visible) continue;
 
@@ -270,11 +280,16 @@ function drawStarField(ctx, points, state) {
   ctx.restore();
 }
 
-function starPosition(point, progress, depth) {
+function starPosition(point, progress, depth, motion = { x: 0, y: 0, stretch: 0 }) {
   const eased = Math.pow(progress, 1.45);
+  const motionLength = Math.hypot(motion.x, motion.y);
+  const dirX = motionLength > 0.02 ? motion.x / motionLength : 0;
+  const dirY = motionLength > 0.02 ? motion.y / motionLength : 0;
+  const along = point.x * dirX + point.y * dirY;
+  const stretch = motion.stretch * 0.08 * eased;
   return {
-    x: point.x * (0.34 + eased * 0.88),
-    y: point.y * (0.34 + eased * 0.88),
+    x: point.x * (0.34 + eased * 0.88) + dirX * along * stretch,
+    y: point.y * (0.34 + eased * 0.88) + dirY * along * stretch,
     z: (-0.5 - (1 - eased) * STAR_DEPTH) * depth,
   };
 }
@@ -373,47 +388,42 @@ function drawSpokes(ctx, spokes, state, widthScale = 1, alphaScale = 1) {
 function drawQuestionConstellation(ctx, question, state) {
   if (!question) return;
 
-  const { depth, eye, screen, viewport, dpr } = state;
+  const { eye, screen, viewport, dpr, time } = state;
   const reveal = activeReveal(question, eye);
   const lock = state.readingHold ?? 0;
   const grace = state.readingGrace > 0 ? 1 : 0;
+  const focus = smoothstep(0.14, 0.78, lock) * Math.max(reveal, grace * 0.9);
+  const cloud = 1 - focus;
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
 
   for (const pass of [
-    { alpha: 0.08, scale: 5.4 },
-    { alpha: 0.19, scale: 2.4 },
-    { alpha: 0.62, scale: 0.86 },
+    { alpha: 0.07, scale: 4.2 },
+    { alpha: 0.18, scale: 1.85 },
+    { alpha: 0.72, scale: 0.82 },
   ]) {
     for (const dot of question.points) {
       const color = TEXT_COLORS[dot.colorShift % TEXT_COLORS.length];
-      const projected = projectPoint(
-        {
-          x: dot.x,
-          y: dot.y,
-          z: dot.z * depth,
-        },
-        eye,
-        screen,
-        viewport,
-        dpr,
-      );
+      const world = elasticQuestionPoint(dot, state, focus, time);
+      const projected = projectPoint(world, eye, screen, viewport, dpr);
       if (!projected.visible) continue;
 
-      const lockFocus = 1 - lock * 0.9;
-      const holdFade = 1 - lock * 0.84;
+      const lockFocus = 1 - focus * 0.74;
+      const holdFade = 0.22 + cloud * 0.78;
+      const glowFocus = 0.38 + cloud * 0.62;
       const size = clamp(
         dot.size *
           projected.scale *
-          (1.16 + Math.max(reveal, grace * 0.86) * 2.8) *
+          (1.05 + Math.max(reveal, grace * 0.86) * 2.45 + cloud * 0.7) *
           pass.scale *
+          glowFocus *
           lockFocus,
-        0.28,
-        lock > 0.56 ? 2.8 : 7.4,
+        0.36,
+        focus > 0.62 ? 2.2 : 7.4,
       );
       ctx.fillStyle = `rgba(${color}, ${
-        pass.alpha * (0.36 + Math.max(reveal, grace * 0.72)) * holdFade
+        pass.alpha * (0.44 + Math.max(reveal, grace * 0.72)) * holdFade
       })`;
       ctx.beginPath();
       ctx.arc(projected.x, projected.y, size, 0, Math.PI * 2);
@@ -422,6 +432,36 @@ function drawQuestionConstellation(ctx, question, state) {
   }
 
   ctx.restore();
+}
+
+function elasticQuestionPoint(dot, state, focus, time) {
+  const motion = state.eyeMotion ?? { x: 0, y: 0, stretch: 0 };
+  const motionLength = Math.hypot(motion.x, motion.y);
+  const dirX = motionLength > 0.02 ? motion.x / motionLength : Math.cos(dot.orbit);
+  const dirY = motionLength > 0.02 ? motion.y / motionLength : Math.sin(dot.orbit);
+  const perpX = -dirY;
+  const perpY = dirX;
+  const cloud = 1 - focus;
+  const stretch = 1 + motion.stretch * (0.72 + cloud * 1.65) * dot.elastic;
+  const squeeze = 1 - motion.stretch * (0.1 + focus * 0.2);
+  const along = dot.scatterX * dirX + dot.scatterY * dirY;
+  const cross = dot.scatterX * perpX + dot.scatterY * perpY;
+  const breathing = Math.sin(time * 0.8 + dot.orbit) * cloud * 0.035;
+  const scatterX =
+    (dirX * along * stretch +
+      perpX * cross * squeeze +
+      dirX * motion.stretch * dot.elastic * 0.34) *
+    cloud;
+  const scatterY =
+    (dirY * along * stretch + perpY * cross * squeeze + dirY * motion.stretch * dot.elastic * 0.2) *
+    cloud;
+  const compression = 1 - focus * 0.08 + motion.stretch * cloud * 0.08;
+
+  return {
+    x: dot.x * compression + scatterX + Math.cos(dot.orbit) * breathing,
+    y: dot.y * compression + scatterY + Math.sin(dot.orbit) * breathing,
+    z: (dot.z + dot.scatterZ * cloud - motion.stretch * cloud * dot.elastic * 2.2) * state.depth,
+  };
 }
 
 function drawQuestionLock(ctx, question, state) {

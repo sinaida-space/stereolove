@@ -17,7 +17,7 @@ The work uses a psychedelic geometric language inspired by op art, moire interfe
 - perspective spokes shift by off-axis projection when the viewer moves,
 - white and pale-cyan star fields move slowly outward from the vanishing point,
 - the question cloud is separated from the background through brighter cyan point tones,
-- question text appears first as a dot-typography constellation, then resolves into a thin glowing outline with a soft flash and small audio cue when the viewer finds the reading position.
+- question text appears first as a cyan dot cloud, then compresses into a thin glowing outline with a soft flash and small audio cue when the viewer finds the reading position.
 
 The visual system should feel precise rather than decorative. It is about cognition, not wallpaper: the artwork asks how much of reality is in the object and how much is constructed by the observer.
 
@@ -29,7 +29,7 @@ The work begins with an onboarding screen that frames the piece as an expanded-s
 - Mouse mode uses pointer position to simulate head movement.
 - Touch mode uses touch position for mobile and tablet navigation.
 
-Looking left, right, up, or down changes the virtual eye position. The tunnel geometry and question constellation shift with motion parallax, making the flat screen behave like a volume that reacts to attention. The fixed structure stays calm while the star field moves through depth, so the sensation is closer to looking into a moving volume than watching a rotating graphic.
+Looking left, right, up, or down changes the virtual eye position. The tunnel geometry and question constellation shift with motion parallax, making the flat screen behave like a volume that reacts to attention. The fixed structure stays calm while the star field moves through depth, so the sensation is closer to looking into a moving volume than watching a rotating graphic. Text points stretch with motion, compress into language when the viewpoint is found, and scatter back into fragments when the viewpoint is lost.
 
 Camera mode treats the first stable face position as neutral. Optional tuning allows the viewer to recenter the view and adjust depth or sensitivity before entering again. Questions change only when the viewer asks for the next one. Once a question resolves, it remains readable for at least three seconds so the viewer can pause with it before moving on.
 
