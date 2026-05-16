@@ -49,6 +49,9 @@ cameraButton.addEventListener("click", () => {
 
 pointerButton.addEventListener("click", () => {
   if (cameraMode) stopCamera();
+  pointer.x = 0;
+  pointer.y = 0;
+  Object.assign(targetEye, DEFAULT_EYE);
   setStatus("Pointer navigation", "idle");
   enterExperience();
 });
