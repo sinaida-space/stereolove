@@ -4,6 +4,8 @@ import { QUESTIONS } from "./questions.js";
 
 const TUNNEL_DEPTH = -17.5;
 const STAR_DEPTH = 17.8;
+const BACKGROUND_COLORS = ["245, 241, 232", "198, 248, 255", "94, 242, 255"];
+const TEXT_COLORS = ["64, 232, 255", "94, 242, 255", "142, 252, 255", "204, 255, 255"];
 
 export function createScene(screen, random = Math.random) {
   const frames = createFrames(screen, random);
@@ -31,21 +33,21 @@ export function selectActiveQuestion(questionPlanes, index = 0) {
 }
 
 export function createFrames(screen, random = Math.random) {
-  return Array.from({ length: 34 }, (_, i) => {
-    const depth = i / 33;
+  return Array.from({ length: 38 }, (_, i) => {
+    const depth = i / 37;
     const z = -0.55 - depth * Math.abs(TUNNEL_DEPTH);
-    const shimmer = (random() - 0.5) * 0.035;
+    const shimmer = (random() - 0.5) * 0.014;
 
     return {
       z,
-      w: screen.width * (1.08 + shimmer),
-      h: screen.height * (1.08 + shimmer * 0.7),
+      w: screen.width * (1.1 + shimmer),
+      h: screen.height * (1.1 + shimmer * 0.7),
       x: 0,
       y: 0,
       rot: 0,
-      opacity: 0.1 + (1 - depth) * 0.24 + (i % 5 === 0 ? 0.14 : 0),
-      color: [PALETTE.ink, PALETTE.cyan, PALETTE.gold, PALETTE.violet, PALETTE.green][i % 5],
-      facet: i % 3,
+      opacity: 0.08 + (1 - depth) * 0.2 + (i % 6 === 0 ? 0.12 : 0),
+      color: i % 3 === 0 ? PALETTE.cyan : BACKGROUND_COLORS[i % BACKGROUND_COLORS.length],
+      facet: 0,
       near: 1 - depth,
     };
   });
@@ -53,34 +55,34 @@ export function createFrames(screen, random = Math.random) {
 
 function createSpokes(screen, random) {
   const spokes = [];
-  const count = 44;
+  const count = 56;
 
   for (let i = 0; i < count; i += 1) {
-    const angle = (i / count) * Math.PI * 2;
-    const wobble = (random() - 0.5) * 0.025;
+    const side = i % 4;
+    const t = (Math.floor(i / 4) + 0.5) / Math.ceil(count / 4);
+    const point = perimeterPoint(screen, side, t);
+    const wobble = (random() - 0.5) * 0.018;
     spokes.push({
-      x: Math.cos(angle) * screen.width * (0.54 + wobble),
-      y: Math.sin(angle) * screen.height * (0.54 + wobble),
-      color: [PALETTE.ink, PALETTE.cyan, PALETTE.gold, PALETTE.violet, PALETTE.green][i % 5],
-      alpha: 0.08 + random() * 0.18,
-      width: 0.35 + random() * 0.85,
+      x: point.x + wobble,
+      y: point.y + wobble * 0.62,
+      color: i % 4 === 0 ? PALETTE.cyan : BACKGROUND_COLORS[i % BACKGROUND_COLORS.length],
+      alpha: 0.05 + random() * 0.1,
+      width: 0.22 + random() * 0.58,
     });
   }
 
   return spokes;
 }
 
-function createField(screen, random) {
-  const palette = [
-    PALETTE.cyan,
-    PALETTE.red,
-    PALETTE.ink,
-    PALETTE.gold,
-    PALETTE.violet,
-    PALETTE.green,
-  ];
+function perimeterPoint(screen, side, t) {
+  if (side === 0) return { x: (t - 0.5) * screen.width * 1.12, y: -screen.height * 0.56 };
+  if (side === 1) return { x: screen.width * 0.56, y: (0.5 - t) * screen.height * 1.12 };
+  if (side === 2) return { x: (0.5 - t) * screen.width * 1.12, y: screen.height * 0.56 };
+  return { x: -screen.width * 0.56, y: (t - 0.5) * screen.height * 1.12 };
+}
 
-  return Array.from({ length: 6400 }, (_, i) => {
+function createField(screen, random) {
+  return Array.from({ length: 5400 }, (_, i) => {
     const z = -0.55 - random() * STAR_DEPTH;
     const angle = random() * Math.PI * 2;
     const shell = Math.pow(random(), 0.28);
@@ -94,16 +96,18 @@ function createField(screen, random) {
       z,
       size: core ? 0.42 + random() * 0.78 : 0.52 + random() * 1.55,
       halo: random() < 0.18 ? 1.5 + random() * 3.1 : 0,
-      speed: core ? 0.028 + random() * 0.024 : 0.045 + random() * 0.07,
+      speed: core ? 0.008 + random() * 0.01 : 0.012 + random() * 0.018,
       phase: random(),
-      trail: 0.025 + random() * 0.055,
-      color: palette[(i + Math.floor(random() * palette.length)) % palette.length],
+      trail: 0.012 + random() * 0.024,
+      color:
+        BACKGROUND_COLORS[
+          (i + Math.floor(random() * BACKGROUND_COLORS.length)) % BACKGROUND_COLORS.length
+        ],
     };
   });
 }
 
 function createQuestionPlanes(screen, random) {
-  const palette = [PALETTE.cyan, PALETTE.gold, PALETTE.green, PALETTE.violet, PALETTE.red];
   const picked = shuffle([...QUESTIONS], random).slice(0, 12);
 
   return picked.map((question, index) => {
@@ -129,7 +133,7 @@ function createQuestionPlanes(screen, random) {
       y,
       rot,
       revealEye,
-      color: palette[index % palette.length],
+      color: TEXT_COLORS[index % TEXT_COLORS.length],
     };
   });
 }
@@ -159,8 +163,8 @@ function createAnamorphicQuestionPoints(samples, question, screen, random) {
     return {
       ...world,
       weight: sample.weight,
-      size: 0.55 + random() * 1.25,
-      colorShift: index % 9,
+      size: 0.82 + random() * 1.45,
+      colorShift: index % TEXT_COLORS.length,
     };
   });
 }
@@ -215,9 +219,9 @@ function drawVoid(ctx, state) {
     vanishing.y,
     viewport.height * 0.92,
   );
-  glow.addColorStop(0, `rgba(245, 241, 232, ${0.15 + flash * 0.12})`);
-  glow.addColorStop(0.18, `rgba(94, 242, 255, ${0.08 + flash * 0.06})`);
-  glow.addColorStop(0.46, `rgba(184, 121, 255, ${0.04 + flash * 0.05})`);
+  glow.addColorStop(0, `rgba(245, 241, 232, ${0.12 + flash * 0.1})`);
+  glow.addColorStop(0.2, `rgba(94, 242, 255, ${0.075 + flash * 0.055})`);
+  glow.addColorStop(0.5, `rgba(198, 248, 255, ${0.035 + flash * 0.035})`);
   glow.addColorStop(1, "rgba(5, 6, 9, 0)");
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, viewport.width, viewport.height);
@@ -383,7 +387,7 @@ function drawQuestionConstellation(ctx, question, state) {
     { alpha: 0.62, scale: 0.86 },
   ]) {
     for (const dot of question.points) {
-      const color = dot.colorShift % 3 === 0 ? PALETTE.ink : question.color;
+      const color = TEXT_COLORS[dot.colorShift % TEXT_COLORS.length];
       const projected = projectPoint(
         {
           x: dot.x,
@@ -466,8 +470,8 @@ function drawQuestionLock(ctx, question, state) {
 
     ctx.globalCompositeOperation = "lighter";
     ctx.lineWidth = Math.max(1.2, 4.4 * dpr);
-    ctx.strokeStyle = `rgba(${question.color}, ${(0.22 + flash * 0.1) * alpha})`;
-    ctx.shadowColor = `rgba(${question.color}, ${(0.82 + flash * 0.26) * alpha})`;
+    ctx.strokeStyle = `rgba(${PALETTE.cyan}, ${(0.22 + flash * 0.1) * alpha})`;
+    ctx.shadowColor = `rgba(${PALETTE.cyan}, ${(0.82 + flash * 0.26) * alpha})`;
     ctx.shadowBlur = (22 + flash * 14) * dpr;
     ctx.strokeText(text, 0, y, maxWidth);
 

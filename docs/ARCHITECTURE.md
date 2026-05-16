@@ -6,7 +6,7 @@ Stereolove is intentionally lightweight. It is a Vite application with a canvas 
 
 - `src/main.js` wires DOM controls, camera state, pointer fallback, resize handling, and the animation loop.
 - `src/audio.js` creates quiet Web Audio ambience and short reveal or navigation cues after a user gesture.
-- `src/scene.js` creates and renders the op-art spatial field: screen aperture, centered portal rings, perspective spokes, particles, glow passes, and active anamorphic question constellations.
+- `src/scene.js` creates and renders the op-art spatial field: screen aperture, centered portal rings, perspective spokes, monochrome particles, glow passes, and active cyan anamorphic question constellations.
 - `src/questions.js` contains the English question prompts rendered as optical constellations.
 - `src/projection.js` contains the head-coupled projection math. This module is pure and unit-tested.
 - `src/face-tracking.js` dynamically loads MediaPipe only when camera mode starts.
@@ -17,9 +17,9 @@ Stereolove is intentionally lightweight. It is a Vite application with a canvas 
 
 The project uses head-coupled perspective. The virtual eye sits in front of the screen. Each world point is projected through that eye onto the physical screen plane. When the eye moves, the projected coordinates shift as if the display were a window.
 
-The scene geometry is built around that idea. The front aperture is aligned to the screen plane, while portal rings, perspective spokes, particles, and question points exist behind it at different depths. The rings are centered and not rotated, so a viewer facing the screen sees the structure converge toward the screen center. Nearer rings and edge lines are rendered with stronger alpha and line width to reinforce depth. When the eye moves, the same fixed world geometry shifts by off-axis projection, as if the monitor were a window into space behind it. Each question point lies on a sightline from a reveal eye through a target letter position, so the prompt assembles from dots at the reveal viewpoint and disperses through parallax as the viewpoint changes.
+The scene geometry is built around that idea. The front aperture is aligned to the screen plane, while portal rings, perspective spokes, particles, and question points exist behind it at different depths. The rings are centered, rectangular, and not rotated, so a viewer facing the screen sees the structure converge toward the screen center. Nearer rings and edge lines are rendered with stronger alpha and line width to reinforce depth. When the eye moves, the same fixed world geometry shifts by off-axis projection, as if the monitor were a window into space behind it. Each question point lies on a sightline from a reveal eye through a target letter position, so the prompt assembles from cyan dots at the reveal viewpoint and disperses through parallax as the viewpoint changes.
 
-The structural geometry avoids autonomous drift. Rings and spokes do not rotate or translate on a timer. The star field does animate through depth: particles move from the far vanishing point toward the viewer, producing outward screen motion and a restrained flight sensation.
+The structural geometry avoids autonomous drift. Rings and spokes do not rotate or translate on a timer. The star field does animate through depth: white and pale-cyan particles move slowly from the far vanishing point toward the viewer, producing outward screen motion and a restrained flight sensation.
 
 The read lock is handled in `src/main.js`. Eye movement is smoothed with time-based damping. When the eye is near the reveal position and remains still, `readingHold` rises and `src/scene.js` fades in a thin glowing letter outline over the point field. The lock is intentionally forgiving: once the prompt resolves, `readingGrace` keeps it readable for at least three seconds before movement can fully dissolve it again.
 
