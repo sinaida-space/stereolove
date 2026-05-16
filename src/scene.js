@@ -3,8 +3,6 @@ import { clamp, projectPoint, projectScreenPointToDepth, rotate2 } from "./proje
 import { QUESTIONS } from "./questions.js";
 import { sampleTextPoints } from "./text-sampler.js";
 
-const QUESTION_INTERVAL = 13;
-
 export function createScene(screen, random = Math.random) {
   const frames = createFrames(screen, random);
   const field = createField(screen, random);
@@ -38,7 +36,7 @@ export function createScene(screen, random = Math.random) {
 
 export function drawScene(ctx, scene, state) {
   const { viewport } = state;
-  const activeQuestion = selectActiveQuestion(scene.questionPlanes, state.time);
+  const activeQuestion = selectActiveQuestion(scene.questionPlanes, state.questionIndex);
 
   drawVoid(ctx, state);
   drawRetinalField(ctx, scene.field, state);
@@ -48,12 +46,13 @@ export function drawScene(ctx, scene, state) {
   drawFrames(ctx, scene.frames, state);
   drawQuestionConstellation(ctx, activeQuestion, state);
   drawTextShards(ctx, scene.textShards, state);
+  drawQuestionLock(ctx, activeQuestion, state);
   drawAperture(ctx, viewport);
 }
 
-export function selectActiveQuestion(questionPlanes, time) {
+export function selectActiveQuestion(questionPlanes, index = 0) {
   if (!questionPlanes.length) return null;
-  return questionPlanes[Math.floor(time / QUESTION_INTERVAL) % questionPlanes.length];
+  return questionPlanes[Math.abs(Math.floor(index)) % questionPlanes.length];
 }
 
 export function createFrames(screen, random = Math.random) {
@@ -158,6 +157,7 @@ function createQuestionPlanes(screen, random) {
 
     return {
       question,
+      lines: wrapQuestion(question),
       points: createAnamorphicQuestionPoints(
         sampleQuestionPoints(question, random),
         { x, y, rot, revealEye },
@@ -369,6 +369,7 @@ function drawQuestionConstellation(ctx, question, state) {
 
   const { time, depth, eye, screen, viewport, dpr } = state;
   const reveal = activeReveal(question, eye, time);
+  const lock = state.readingHold ?? 0;
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
@@ -394,13 +395,68 @@ function drawQuestionConstellation(ctx, question, state) {
       );
       if (!projected.visible) continue;
 
-      const size = clamp(dot.size * projected.scale * (1.1 + reveal * 2.4) * pass.scale, 0.55, 7.5);
-      ctx.fillStyle = `rgba(${color}, ${pass.alpha * (0.42 + reveal * 0.9)})`;
+      const lockFocus = 1 - lock * 0.42;
+      const size = clamp(
+        dot.size * projected.scale * (1.1 + reveal * 2.4) * pass.scale * lockFocus,
+        0.45,
+        7.5,
+      );
+      ctx.fillStyle = `rgba(${color}, ${pass.alpha * (0.42 + reveal * 0.9) * (1 - lock * 0.18)})`;
       ctx.beginPath();
       ctx.arc(projected.x, projected.y, size, 0, Math.PI * 2);
       ctx.fill();
     }
   }
+
+  ctx.restore();
+}
+
+function drawQuestionLock(ctx, question, state) {
+  if (!question) return;
+
+  const lock = state.readingHold ?? 0;
+  if (lock <= 0.03) return;
+
+  const { viewport, dpr, screen, eye, depth, time } = state;
+  const anchor = projectPoint(
+    { x: question.x, y: question.y, z: -2.2 * depth },
+    eye,
+    screen,
+    viewport,
+    dpr,
+  );
+  if (!anchor.visible) return;
+
+  const reveal = activeReveal(question, eye, time);
+  const alpha = smoothstep(0.16, 0.76, lock) * reveal;
+  if (alpha <= 0.01) return;
+
+  const fontSize = clamp(anchor.scale * 54, 16 * dpr, 34 * dpr);
+  const lineHeight = fontSize * 1.18;
+  const maxWidth = Math.min(viewport.width * 0.74, 820 * dpr);
+  const totalHeight = (question.lines.length - 1) * lineHeight;
+
+  ctx.save();
+  ctx.translate(anchor.x, anchor.y);
+  ctx.rotate(question.rot * 0.38 + eye.x * 0.018);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `700 ${fontSize}px Inter, Arial, sans-serif`;
+  ctx.globalCompositeOperation = "lighter";
+
+  question.lines.forEach((line, index) => {
+    const y = index * lineHeight - totalHeight / 2;
+    ctx.lineWidth = Math.max(1, 5.5 * dpr);
+    ctx.strokeStyle = `rgba(${question.color}, ${0.12 * alpha})`;
+    ctx.shadowColor = `rgba(${question.color}, ${0.55 * alpha})`;
+    ctx.shadowBlur = 18 * dpr;
+    ctx.strokeText(line, 0, y, maxWidth);
+
+    ctx.lineWidth = Math.max(0.7, 1.1 * dpr);
+    ctx.strokeStyle = `rgba(245, 241, 232, ${0.82 * alpha})`;
+    ctx.shadowBlur = 7 * dpr;
+    ctx.strokeText(line, 0, y, maxWidth);
+  });
 
   ctx.restore();
 }
@@ -469,6 +525,30 @@ function activeReveal(question, eye, time) {
     1,
   );
   return clamp(0.08 + gaze * 0.92 + Math.sin(time * 0.75) * 0.05, 0.08, 1);
+}
+
+function smoothstep(edge0, edge1, value) {
+  const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function wrapQuestion(text) {
+  const words = text.split(" ");
+  const lines = [];
+  let line = "";
+  const maxChars = 30;
+
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    if (test.length > maxChars && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.slice(0, 4);
 }
 
 function wrapCanvasText(ctx, text, maxWidth) {

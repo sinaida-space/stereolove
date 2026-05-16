@@ -19,6 +19,7 @@ https://sinaida-space.github.io/stereolove/
 - The site includes a mini footer with an all-rights-reserved notice and a link to `sinaida.eu`.
 - The artwork can enter a full-screen experience mode that hides navigation, footer, cookie notice, and controls.
 - The active artwork presents one anamorphic question at a time; the prompt is assembled from glowing 3D dots rather than drawn as ordinary text.
+- The active artwork includes a `Next question` control and keyboard shortcut so questions change intentionally instead of disappearing before they can be read.
 - Camera mode is opt-in and starts only after a user gesture.
 - The privacy policy describes local camera processing, GitHub Pages hosting, MediaPipe third-party assets, and essential local storage.
 - The cookie notice is limited to essential local storage and links to the privacy policy.
