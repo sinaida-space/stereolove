@@ -12,6 +12,7 @@ const cameraButton = document.querySelector("#cameraButton");
 const pointerButton = document.querySelector("#pointerButton");
 const touchButton = document.querySelector("#touchButton");
 const calibrateButton = document.querySelector("#calibrateButton");
+const nextQuestionButton = document.querySelector("#nextQuestionButton");
 const exitExperienceButton = document.querySelector("#exitExperienceButton");
 const cookieBanner = document.querySelector("#cookieBanner");
 const cookieAcceptButton = document.querySelector("#cookieAcceptButton");
@@ -31,10 +32,15 @@ let cameraMode = false;
 let lastVideoTime = -1;
 let lastFace = null;
 let startTime = performance.now();
+let previousFrameTime = startTime;
+let questionIndex = 0;
+let motionStability = 0;
+let readingHold = 0;
 
 const pointer = { x: 0, y: 0 };
 const eye = { ...DEFAULT_EYE };
 const targetEye = { ...DEFAULT_EYE };
+const previousEye = { ...DEFAULT_EYE };
 const neutralFace = { x: 0.5, y: 0.48, eyeSep: 0.17, ready: false };
 
 resize();
@@ -82,6 +88,7 @@ calibrateButton.addEventListener("click", () => {
 });
 
 exitExperienceButton.addEventListener("click", exitExperience);
+nextQuestionButton.addEventListener("click", nextQuestion);
 cookieAcceptButton.addEventListener("click", acceptCookieNotice);
 
 document.addEventListener("fullscreenchange", () => {
@@ -90,6 +97,7 @@ document.addEventListener("fullscreenchange", () => {
 
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") exitExperience();
+  if (event.key.toLowerCase() === "n") nextQuestion();
 });
 
 window.addEventListener("pointermove", (event) => {
@@ -153,13 +161,19 @@ function stopCamera() {
 
 function animate() {
   requestAnimationFrame(animate);
-  const time = (performance.now() - startTime) * 0.001;
+  const now = performance.now();
+  const time = (now - startTime) * 0.001;
+  const dt = Math.min((now - previousFrameTime) * 0.001, 0.05);
+  previousFrameTime = now;
 
-  if (cameraMode) detectFace(performance.now());
+  if (cameraMode) detectFace(now);
 
-  eye.x = lerp(eye.x, targetEye.x, 0.16);
-  eye.y = lerp(eye.y, targetEye.y, 0.16);
-  eye.z = lerp(eye.z, targetEye.z, 0.16);
+  const follow = 1 - Math.exp(-dt * 5.2);
+  eye.x = lerp(eye.x, targetEye.x, follow);
+  eye.y = lerp(eye.y, targetEye.y, follow);
+  eye.z = lerp(eye.z, targetEye.z, follow);
+
+  updateReadingState(dt);
 
   drawScene(ctx, scene, {
     viewport,
@@ -168,6 +182,9 @@ function animate() {
     eye,
     time,
     depth: Number(depthSlider.value),
+    questionIndex,
+    stability: motionStability,
+    readingHold,
   });
   updateReadout();
 }
@@ -225,9 +242,41 @@ function updateReadout() {
 }
 
 function updatePointerEye(event) {
+  if (event.target.closest?.(".experience-toolbar")) return;
   pointer.x = (event.clientX / window.innerWidth - 0.5) * 2;
   pointer.y = -(event.clientY / window.innerHeight - 0.5) * 2;
   Object.assign(targetEye, derivePointerEye(pointer, Number(sensitivitySlider.value)));
+}
+
+function updateReadingState(dt) {
+  const distance = Math.hypot(
+    eye.x - previousEye.x,
+    eye.y - previousEye.y,
+    (eye.z - previousEye.z) * 0.34,
+  );
+  const speed = distance / Math.max(dt, 0.001);
+  const aligned = 1 - Math.min(1, Math.hypot(eye.x * 0.95, eye.y * 1.35));
+  const stableTarget = speed < 0.08 ? 1 : 0;
+
+  motionStability = lerp(motionStability, stableTarget, 1 - Math.exp(-dt * 4.2));
+  const lockTarget = aligned > 0.72 && motionStability > 0.62 ? 1 : 0;
+  const rate = lockTarget ? 0.55 : -1.05;
+  readingHold = Math.min(1, Math.max(0, readingHold + dt * rate));
+
+  previousEye.x = eye.x;
+  previousEye.y = eye.y;
+  previousEye.z = eye.z;
+}
+
+function nextQuestion() {
+  if (!scene?.questionPlanes?.length) return;
+  questionIndex = (questionIndex + 1) % scene.questionPlanes.length;
+  pointer.x = 0;
+  pointer.y = 0;
+  Object.assign(targetEye, DEFAULT_EYE);
+  readingHold = 0;
+  motionStability = 0;
+  setStatus("Next question", "live");
 }
 
 async function enterExperience() {

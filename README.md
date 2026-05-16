@@ -66,6 +66,8 @@ The public page starts with a short onboarding screen. The viewer chooses one of
 
 The header, footer, cookie notice, and controls are hidden while the artwork is active. The `Exit` button returns to the onboarding screen.
 
+Questions do not advance on a timer. The viewer can hold still to let the point field resolve into a thin glowing text outline, then use `Next question` or the `N` key when ready.
+
 Camera mode requires `getUserMedia`, which works on `localhost` or HTTPS. Camera processing runs locally in the browser. The first stable face position is treated as neutral, and `Recenter view` is available in optional tuning.
 
 MediaPipe is loaded only when camera mode starts, so the artwork still runs if camera access is blocked.

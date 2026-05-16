@@ -18,6 +18,8 @@ The project uses head-coupled perspective. The virtual eye sits in front of the 
 
 The scene geometry is built around that idea. The front aperture is aligned to the screen plane, while floating frames, particles, rays, and question points exist behind it at different depths. Each question point lies on a sightline from a reveal eye through a target letter position, so the prompt assembles from dots at the reveal viewpoint and disperses through parallax as the viewpoint changes. The artwork avoids a literal corridor; depth is produced by off-axis projection, motion parallax, and layered optical structure rather than walls.
 
+The read lock is handled in `src/main.js`. Eye movement is smoothed with time-based damping. When the eye is near the reveal position and remains still, `readingHold` rises and `src/scene.js` fades in a thin glowing letter outline over the point field. Movement decays the hold state, returning the prompt to scattered dots.
+
 This is different from a stereogram. It does not create binocular disparity. It creates motion parallax and off-axis perspective.
 
 ## Camera Dependency

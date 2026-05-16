@@ -31,7 +31,7 @@ The work begins with an onboarding screen that frames the piece as an expanded-s
 
 Looking left, right, up, or down changes the virtual eye position. The layered panes and question constellation shift with motion parallax, making the flat screen behave like a volume that reacts to attention.
 
-Camera mode treats the first stable face position as neutral. Optional tuning allows the viewer to recenter the view and adjust depth or sensitivity before entering again.
+Camera mode treats the first stable face position as neutral. Optional tuning allows the viewer to recenter the view and adjust depth or sensitivity before entering again. Questions change only when the viewer asks for the next one, so the work can pause long enough for reading and reflection.
 
 ## Theme
 
