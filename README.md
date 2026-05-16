@@ -66,6 +66,8 @@ The public page starts with a short onboarding screen. The viewer chooses one of
 
 The header, footer, cookie notice, and controls are hidden while the artwork is active. The `Exit` button returns to the onboarding screen.
 
+On mobile portrait screens, the interface recommends rotating the phone to landscape. Landscape gives the head-coupled projection enough horizontal space and makes the text cloud easier to resolve.
+
 Questions do not advance on a timer. The viewer can hold still to let the point field resolve into a thin glowing text outline, then use `Next question` or the `N` key when ready.
 
 When the question resolves, the text remains readable for at least three seconds and a quiet Web Audio chime marks the moment. Ambient sound is generated in the browser after the viewer chooses an interaction mode; no audio files are loaded.

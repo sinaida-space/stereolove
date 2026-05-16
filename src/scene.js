@@ -240,12 +240,13 @@ function drawStarField(ctx, points, state) {
 
   for (const point of points) {
     const progress = (point.phase + time * point.speed) % 1;
-    const current = starPosition(point, progress, depth, state.eyeMotion);
+    const current = starPosition(point, progress, depth, state.eyeMotion, state.isCompact);
     const previous = starPosition(
       point,
       Math.max(0, progress - point.trail),
       depth,
       state.eyeMotion,
+      state.isCompact,
     );
     const projected = projectPoint(current, eye, screen, viewport, dpr);
     if (!projected.visible) continue;
@@ -280,13 +281,19 @@ function drawStarField(ctx, points, state) {
   ctx.restore();
 }
 
-function starPosition(point, progress, depth, motion = { x: 0, y: 0, stretch: 0 }) {
+function starPosition(
+  point,
+  progress,
+  depth,
+  motion = { x: 0, y: 0, stretch: 0 },
+  isCompact = false,
+) {
   const eased = Math.pow(progress, 1.45);
   const motionLength = Math.hypot(motion.x, motion.y);
   const dirX = motionLength > 0.02 ? motion.x / motionLength : 0;
   const dirY = motionLength > 0.02 ? motion.y / motionLength : 0;
   const along = point.x * dirX + point.y * dirY;
-  const stretch = motion.stretch * 0.08 * eased;
+  const stretch = motion.stretch * (isCompact ? 0.035 : 0.055) * eased;
   return {
     x: point.x * (0.34 + eased * 0.88) + dirX * along * stretch,
     y: point.y * (0.34 + eased * 0.88) + dirY * along * stretch,
@@ -392,7 +399,10 @@ function drawQuestionConstellation(ctx, question, state) {
   const reveal = activeReveal(question, eye);
   const lock = state.readingHold ?? 0;
   const grace = state.readingGrace > 0 ? 1 : 0;
-  const focus = smoothstep(0.14, 0.78, lock) * Math.max(reveal, grace * 0.9);
+  const compactBoost = state.isCompact ? 0.18 : 0;
+  const focus =
+    smoothstep(0.1, state.isCompact ? 0.58 : 0.72, lock + compactBoost) *
+    Math.max(reveal, grace * 0.92);
   const cloud = 1 - focus;
 
   ctx.save();
@@ -410,17 +420,17 @@ function drawQuestionConstellation(ctx, question, state) {
       if (!projected.visible) continue;
 
       const lockFocus = 1 - focus * 0.74;
-      const holdFade = 0.22 + cloud * 0.78;
-      const glowFocus = 0.38 + cloud * 0.62;
+      const holdFade = (state.isCompact ? 0.16 : 0.22) + cloud * (state.isCompact ? 0.66 : 0.78);
+      const glowFocus = (state.isCompact ? 0.3 : 0.38) + cloud * (state.isCompact ? 0.5 : 0.62);
       const size = clamp(
         dot.size *
           projected.scale *
-          (1.05 + Math.max(reveal, grace * 0.86) * 2.45 + cloud * 0.7) *
+          (1 + Math.max(reveal, grace * 0.86) * (state.isCompact ? 2.05 : 2.35) + cloud * 0.62) *
           pass.scale *
           glowFocus *
           lockFocus,
         0.36,
-        focus > 0.62 ? 2.2 : 7.4,
+        focus > 0.62 ? (state.isCompact ? 1.75 : 2.1) : state.isCompact ? 5.8 : 7.2,
       );
       ctx.fillStyle = `rgba(${color}, ${
         pass.alpha * (0.44 + Math.max(reveal, grace * 0.72)) * holdFade
@@ -442,8 +452,10 @@ function elasticQuestionPoint(dot, state, focus, time) {
   const perpX = -dirY;
   const perpY = dirX;
   const cloud = 1 - focus;
-  const stretch = 1 + motion.stretch * (0.72 + cloud * 1.65) * dot.elastic;
-  const squeeze = 1 - motion.stretch * (0.1 + focus * 0.2);
+  const compact = state.isCompact ? 0.64 : 1;
+  const scatterScale = state.isCompact ? 0.58 : 1;
+  const stretch = 1 + motion.stretch * (0.34 + cloud * 0.9) * dot.elastic * compact;
+  const squeeze = 1 - motion.stretch * (0.05 + focus * 0.12) * compact;
   const along = dot.scatterX * dirX + dot.scatterY * dirY;
   const cross = dot.scatterX * perpX + dot.scatterY * perpY;
   const breathing = Math.sin(time * 0.8 + dot.orbit) * cloud * 0.035;
@@ -451,16 +463,20 @@ function elasticQuestionPoint(dot, state, focus, time) {
     (dirX * along * stretch +
       perpX * cross * squeeze +
       dirX * motion.stretch * dot.elastic * 0.34) *
-    cloud;
+    cloud *
+    scatterScale;
   const scatterY =
     (dirY * along * stretch + perpY * cross * squeeze + dirY * motion.stretch * dot.elastic * 0.2) *
-    cloud;
+    cloud *
+    scatterScale;
   const compression = 1 - focus * 0.08 + motion.stretch * cloud * 0.08;
 
   return {
     x: dot.x * compression + scatterX + Math.cos(dot.orbit) * breathing,
     y: dot.y * compression + scatterY + Math.sin(dot.orbit) * breathing,
-    z: (dot.z + dot.scatterZ * cloud - motion.stretch * cloud * dot.elastic * 2.2) * state.depth,
+    z:
+      (dot.z + dot.scatterZ * cloud * scatterScale - motion.stretch * cloud * dot.elastic * 1.15) *
+      state.depth,
   };
 }
 
@@ -591,7 +607,7 @@ function vanishingPoint(state) {
 
 function activeReveal(question, eye) {
   const gaze = clamp(
-    1 - Math.hypot((question.revealEye.x - eye.x) * 0.52, (question.revealEye.y - eye.y) * 0.82),
+    1 - Math.hypot((question.revealEye.x - eye.x) * 0.44, (question.revealEye.y - eye.y) * 0.68),
     0,
     1,
   );
