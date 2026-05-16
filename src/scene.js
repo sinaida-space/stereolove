@@ -48,7 +48,6 @@ export function drawScene(ctx, scene, state) {
   drawFrames(ctx, scene.frames, state);
   drawQuestionConstellation(ctx, activeQuestion, state);
   drawTextShards(ctx, scene.textShards, state);
-  drawFloatingQuestion(ctx, activeQuestion, state);
   drawAperture(ctx, viewport);
 }
 
@@ -148,19 +147,60 @@ function createQuestionPlanes(screen, random) {
   const picked = shuffle([...QUESTIONS], random).slice(0, 10);
 
   return picked.map((question, index) => {
-    const z = -2.4 - index * 1.18;
     const x = Math.sin(index * 1.7) * screen.width * 0.16;
     const y = Math.cos(index * 1.13) * screen.height * 0.13;
+    const rot = (random() - 0.5) * 0.22;
+    const revealEye = {
+      x: DEFAULT_EYE.x,
+      y: DEFAULT_EYE.y,
+      z: DEFAULT_EYE.z,
+    };
 
     return {
       question,
-      lines: wrapQuestion(question),
-      points: sampleQuestionPoints(question, random),
+      points: createAnamorphicQuestionPoints(
+        sampleQuestionPoints(question, random),
+        { x, y, rot, revealEye },
+        screen,
+        random,
+      ),
       x,
       y,
-      z,
-      rot: (random() - 0.5) * 0.18,
+      rot,
+      revealEye,
       color: palette[index % palette.length],
+    };
+  });
+}
+
+export function anamorphicPointForView(screenPoint, z, revealEye) {
+  const scale = (revealEye.z - z) / revealEye.z;
+  return {
+    x: revealEye.x + (screenPoint.x - revealEye.x) * scale,
+    y: revealEye.y + (screenPoint.y - revealEye.y) * scale,
+    z,
+  };
+}
+
+function createAnamorphicQuestionPoints(samples, question, screen, random) {
+  const width = screen.width * 0.95;
+  const height = screen.height * 0.42;
+
+  return samples.map((sample, index) => {
+    const rotated = rotate2(sample.x * width, sample.y * height, question.rot);
+    const target = {
+      x: question.x + rotated.x,
+      y: question.y + rotated.y,
+    };
+    const z = -1.7 - random() * 10.8;
+    const world = anamorphicPointForView(target, z, question.revealEye);
+
+    return {
+      ...world,
+      weight: sample.weight,
+      phase: random() * Math.PI * 2,
+      size: 0.45 + random() * 1.05,
+      colorShift: index % 7,
     };
   });
 }
@@ -196,7 +236,7 @@ function sampleQuestionPoints(text, random) {
     }
   }
 
-  return shuffle(candidates, random).slice(0, 520);
+  return shuffle(candidates, random).slice(0, 620);
 }
 
 function drawVoid(ctx, state) {
@@ -329,30 +369,40 @@ function drawQuestionConstellation(ctx, question, state) {
 
   const { time, depth, eye, screen, viewport, dpr } = state;
   const reveal = activeReveal(question, eye, time);
-  const width = screen.width * 0.98;
-  const height = screen.height * 0.42;
 
-  for (const dot of question.points) {
-    const rotated = rotate2(dot.x * width, dot.y * height, question.rot);
-    const projected = projectPoint(
-      {
-        x: question.x + rotated.x,
-        y: question.y + rotated.y,
-        z: question.z * depth + Math.sin(time * 0.45 + dot.weight * 5) * 0.06,
-      },
-      eye,
-      screen,
-      viewport,
-      dpr,
-    );
-    if (!projected.visible) continue;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
 
-    const size = clamp((1.5 + dot.weight * 2.5) * projected.scale * 3.2, 0.85, 5.5);
-    ctx.fillStyle = `rgba(${question.color}, ${0.1 + reveal * 0.72})`;
-    ctx.beginPath();
-    ctx.arc(projected.x, projected.y, size, 0, Math.PI * 2);
-    ctx.fill();
+  for (const pass of [
+    { alpha: 0.14, scale: 6.2 },
+    { alpha: 0.3, scale: 2.9 },
+    { alpha: 0.72, scale: 1 },
+  ]) {
+    for (const dot of question.points) {
+      const pulse = Math.sin(time * 0.9 + dot.phase) * 0.018;
+      const color = dot.colorShift % 3 === 0 ? PALETTE.ink : question.color;
+      const projected = projectPoint(
+        {
+          x: dot.x,
+          y: dot.y,
+          z: (dot.z + pulse) * depth,
+        },
+        eye,
+        screen,
+        viewport,
+        dpr,
+      );
+      if (!projected.visible) continue;
+
+      const size = clamp(dot.size * projected.scale * (1.1 + reveal * 2.4) * pass.scale, 0.55, 7.5);
+      ctx.fillStyle = `rgba(${color}, ${pass.alpha * (0.42 + reveal * 0.9)})`;
+      ctx.beginPath();
+      ctx.arc(projected.x, projected.y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
+
+  ctx.restore();
 }
 
 function drawTextShards(ctx, shards, state) {
@@ -376,45 +426,6 @@ function drawTextShards(ctx, shards, state) {
     ctx.fillRect(-size / 2, -size / 2, size, size);
     ctx.restore();
   }
-}
-
-function drawFloatingQuestion(ctx, question, state) {
-  if (!question) return;
-
-  const { viewport, dpr, screen, eye, depth, time } = state;
-  const projected = projectPoint(
-    { x: question.x, y: question.y - screen.height * 0.18, z: (question.z - 0.22) * depth },
-    eye,
-    screen,
-    viewport,
-    dpr,
-  );
-  if (!projected.visible) return;
-
-  const reveal = activeReveal(question, eye, time);
-  const fontSize = clamp(projected.scale * 72, 18 * dpr, 38 * dpr);
-  const lineHeight = fontSize * 1.18;
-  const maxWidth = Math.min(viewport.width * 0.72, 780 * dpr);
-
-  ctx.save();
-  ctx.translate(projected.x, projected.y);
-  ctx.rotate(question.rot * 0.45 + eye.x * 0.035);
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = `800 ${fontSize}px Inter, Arial, sans-serif`;
-  ctx.shadowColor = `rgba(${question.color}, ${0.65 * reveal})`;
-  ctx.shadowBlur = 18 * dpr;
-  ctx.lineWidth = Math.max(1, 2.5 * dpr);
-
-  const totalHeight = (question.lines.length - 1) * lineHeight;
-  question.lines.forEach((line, index) => {
-    const y = index * lineHeight - totalHeight / 2;
-    ctx.strokeStyle = `rgba(5, 6, 9, ${0.42 + reveal * 0.22})`;
-    ctx.fillStyle = `rgba(245, 241, 232, ${0.48 + reveal * 0.48})`;
-    ctx.strokeText(line, 0, y, maxWidth);
-    ctx.fillText(line, 0, y, maxWidth);
-  });
-  ctx.restore();
 }
 
 function drawAperture(ctx, viewport) {
@@ -453,30 +464,11 @@ function drawWorldLine(ctx, a, b, state, color, alpha, lineWidth = 1) {
 
 function activeReveal(question, eye, time) {
   const gaze = clamp(
-    1 - Math.hypot(question.x * 0.22 - eye.x * 0.24, question.y * 0.32 - eye.y * 0.3),
+    1 - Math.hypot((question.revealEye.x - eye.x) * 0.78, (question.revealEye.y - eye.y) * 1.15),
     0,
     1,
   );
-  return clamp(0.45 + gaze * 0.35 + Math.sin(time * 0.75) * 0.08, 0.28, 0.96);
-}
-
-function wrapQuestion(text) {
-  const words = text.split(" ");
-  const lines = [];
-  let line = "";
-  const maxChars = 28;
-
-  for (const word of words) {
-    const test = line ? `${line} ${word}` : word;
-    if (test.length > maxChars && line) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = test;
-    }
-  }
-  if (line) lines.push(line);
-  return lines.slice(0, 4);
+  return clamp(0.08 + gaze * 0.92 + Math.sin(time * 0.75) * 0.05, 0.08, 1);
 }
 
 function wrapCanvasText(ctx, text, maxWidth) {
