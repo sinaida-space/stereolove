@@ -28,10 +28,10 @@ const xReadout = document.querySelector("#xReadout");
 const yReadout = document.querySelector("#yReadout");
 const zReadout = document.querySelector("#zReadout");
 const FRAME_PROFILES = [
-  { name: "high", desktopFps: 48, compactFps: 30, faceMs: 120, handMs: 260 },
-  { name: "balanced", desktopFps: 38, compactFps: 24, faceMs: 170, handMs: 360 },
-  { name: "low", desktopFps: 28, compactFps: 18, faceMs: 240, handMs: 520 },
-  { name: "panic", desktopFps: 20, compactFps: 14, faceMs: 340, handMs: 760 },
+  { name: "high", desktopFps: 60, compactFps: 40, faceMs: 120, handMs: 260 },
+  { name: "balanced", desktopFps: 48, compactFps: 32, faceMs: 170, handMs: 360 },
+  { name: "low", desktopFps: 36, compactFps: 26, faceMs: 240, handMs: 520 },
+  { name: "panic", desktopFps: 28, compactFps: 20, faceMs: 340, handMs: 760 },
 ];
 
 let dpr = 1;
@@ -247,7 +247,7 @@ function animate() {
     if (!faceDetectedThisFrame) detectHand(now);
   }
 
-  const follow = 1 - Math.exp(-dt * 2.25);
+  const follow = 1 - Math.exp(-dt * 2.75);
   eye.x = lerp(eye.x, targetEye.x, follow);
   eye.y = lerp(eye.y, targetEye.y, follow);
   eye.z = lerp(eye.z, targetEye.z, follow);
@@ -370,10 +370,10 @@ function getCurrentProfile() {
 }
 
 function getMaxDpr() {
-  if (isCompactViewport()) return performanceLevel >= 2 ? 0.82 : 1;
-  if (performanceLevel >= 3) return 0.85;
+  if (isCompactViewport()) return 1;
+  if (performanceLevel >= 3) return 1;
   if (performanceLevel >= 2) return 1;
-  return 1.25;
+  return 1.35;
 }
 
 function getFrameInterval() {
@@ -393,7 +393,7 @@ function getSceneQuality() {
 
 function updatePerformanceBudget(renderCost, frameInterval) {
   renderCostAverage = renderCostAverage ? renderCostAverage * 0.92 + renderCost * 0.08 : renderCost;
-  const overload = renderCostAverage > frameInterval * 0.78 || renderCost > frameInterval * 1.15;
+  const overload = renderCostAverage > frameInterval * 0.94 || renderCost > frameInterval * 1.45;
 
   if (overload && performanceLevel < FRAME_PROFILES.length - 1) {
     setPerformanceLevel(performanceLevel + 1);
@@ -401,9 +401,9 @@ function updatePerformanceBudget(renderCost, frameInterval) {
     return;
   }
 
-  if (renderCostAverage < frameInterval * 0.36 && performanceLevel > 0) {
+  if (renderCostAverage < frameInterval * 0.42 && performanceLevel > 0) {
     coolFrames += 1;
-    if (coolFrames > 240) {
+    if (coolFrames > 150) {
       setPerformanceLevel(performanceLevel - 1);
       coolFrames = 0;
     }
