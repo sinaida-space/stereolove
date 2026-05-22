@@ -1,6 +1,8 @@
 import { DEFAULT_EYE } from "./config.js";
 import { createAudioController } from "./audio.js";
 import { createFaceTracker, extractFaceMeasurement } from "./face-tracking.js";
+import { createHandTracker, extractNearFaceHand } from "./hand-tracking.js";
+import { QUESTIONS } from "./questions.js";
 import { createScene, drawScene, selectActiveQuestion } from "./scene.js";
 import { deriveFaceEye, derivePointerEye, lerp, makeScreen } from "./projection.js";
 
@@ -14,7 +16,10 @@ const pointerButton = document.querySelector("#pointerButton");
 const touchButton = document.querySelector("#touchButton");
 const calibrateButton = document.querySelector("#calibrateButton");
 const nextQuestionButton = document.querySelector("#nextQuestionButton");
+const cameraOffButton = document.querySelector("#cameraOffButton");
+const soundToggleButton = document.querySelector("#soundToggleButton");
 const exitExperienceButton = document.querySelector("#exitExperienceButton");
+const calibrationMeter = document.querySelector("#calibrationMeter");
 const cookieBanner = document.querySelector("#cookieBanner");
 const cookieAcceptButton = document.querySelector("#cookieAcceptButton");
 const depthSlider = document.querySelector("#depthSlider");
@@ -29,13 +34,19 @@ let screen = makeScreen(1, 1);
 let scene = null;
 let stream = null;
 let faceTracker = null;
+let handTracker = null;
 let cameraMode = false;
 let lastVideoTime = -1;
+let lastHandVideoTime = -1;
 let lastFace = null;
 let startTime = performance.now();
 let previousFrameTime = startTime;
 let nextFaceDetectAt = 0;
+let nextHandDetectAt = 0;
 let nextReadoutAt = 0;
+let questionDeck = [];
+let questionDeckCursor = 0;
+let currentQuestionBatch = [];
 let questionIndex = 0;
 let motionStability = 0;
 let readingHold = 0;
@@ -43,6 +54,14 @@ let readingGrace = 0;
 let readingSmoke = 0;
 let revealFlash = 0;
 let readingCaptured = false;
+let gestureCooldown = 0;
+let gestureTransition = 0;
+let pendingGestureQuestion = false;
+let calibrationActive = false;
+let calibrationProgress = 0;
+let handHint = 0;
+let handSeen = false;
+let lastQuestionChangeAt = performance.now();
 let motionX = 0;
 let motionY = 0;
 let motionStretch = 0;
@@ -55,9 +74,12 @@ const neutralFace = { x: 0.5, y: 0.48, eyeSep: 0.17, ready: false };
 const audio = createAudioController();
 
 resize();
-scene = createScene(screen, Math.random, getRenderQuality());
+resetQuestionDeck();
+currentQuestionBatch = takeQuestionBatch();
+scene = createScene(screen, Math.random, getRenderQuality(), currentQuestionBatch);
 hydrateCookieBanner();
 hydrateQaMode();
+syncSoundButton();
 animate();
 
 cameraButton.addEventListener("click", () => {
@@ -102,7 +124,9 @@ calibrateButton.addEventListener("click", () => {
 });
 
 exitExperienceButton.addEventListener("click", exitExperience);
-nextQuestionButton.addEventListener("click", nextQuestion);
+nextQuestionButton.addEventListener("click", () => nextQuestion());
+cameraOffButton.addEventListener("click", switchCameraOff);
+soundToggleButton.addEventListener("click", toggleSound);
 cookieAcceptButton.addEventListener("click", acceptCookieNotice);
 
 document.addEventListener("fullscreenchange", () => {
@@ -130,7 +154,7 @@ window.addEventListener("pointerleave", () => {
 
 window.addEventListener("resize", () => {
   resize();
-  scene = createScene(screen, Math.random, getRenderQuality());
+  scene = createScene(screen, Math.random, getRenderQuality(), currentQuestionBatch);
 });
 
 async function startCamera({ enterOnReady = false } = {}) {
@@ -147,11 +171,16 @@ async function startCamera({ enterOnReady = false } = {}) {
     await video.play();
     cameraMode = true;
     neutralFace.ready = false;
+    calibrationActive = true;
+    calibrationProgress = 0;
+    handSeen = false;
     document.body.classList.add("camera-on");
+    document.body.classList.add("calibrating");
     cameraButton.textContent = "Stop camera";
-    setStatus("Looking for face", "idle");
+    setStatus("Align your face", "idle");
     audio.start();
     if (enterOnReady) enterExperience();
+    loadHandTracker();
   } catch (error) {
     cameraMode = false;
     setStatus(
@@ -168,8 +197,12 @@ function stopCamera() {
   if (stream) stream.getTracks().forEach((track) => track.stop());
   stream = null;
   cameraMode = false;
+  calibrationActive = false;
+  calibrationProgress = 0;
   lastFace = null;
+  handSeen = false;
   document.body.classList.remove("camera-on");
+  document.body.classList.remove("calibrating");
   cameraButton.textContent = "Use camera";
   setStatus("Choose a mode to enter", "idle");
 }
@@ -184,7 +217,10 @@ function animate() {
   const dt = Math.min((now - previousFrameTime) * 0.001, 0.07);
   previousFrameTime = now;
 
-  if (cameraMode) detectFace(now);
+  if (cameraMode) {
+    detectFace(now);
+    detectHand(now);
+  }
 
   const follow = 1 - Math.exp(-dt * 2.25);
   eye.x = lerp(eye.x, targetEye.x, follow);
@@ -192,6 +228,8 @@ function animate() {
   eye.z = lerp(eye.z, targetEye.z, follow);
 
   updateReadingState(dt, selectActiveQuestion(scene.questionPlanes, questionIndex));
+  updateGestureState(dt, now);
+  updateCalibrationState(dt);
   revealFlash = Math.max(0, revealFlash - dt * 0.82);
 
   drawScene(ctx, scene, {
@@ -207,6 +245,8 @@ function animate() {
     readingGrace,
     readingSmoke,
     revealFlash,
+    transitionSpin: gestureTransition,
+    handHint,
     isCompact: isCompactViewport(),
     quality: getRenderQuality(),
     eyeMotion: {
@@ -233,7 +273,12 @@ function detectFace(now) {
   const measurement = extractFaceMeasurement(faceTracker.detectForVideo(video, now));
 
   if (!measurement) {
-    setStatus("Looking for face", "idle");
+    if (calibrationActive) {
+      calibrationProgress = Math.max(0, calibrationProgress - 0.035);
+      setStatus("Align your face", "idle");
+    } else {
+      setStatus("Looking for face", "idle");
+    }
     return;
   }
 
@@ -250,7 +295,33 @@ function detectFace(now) {
     targetEye,
     deriveFaceEye(measurement, neutralFace, screen, Number(sensitivitySlider.value)),
   );
-  setStatus("Tracking face", "live");
+  if (!calibrationActive)
+    setStatus(handTracker ? "Tracking face and hand" : "Tracking face", "live");
+}
+
+async function loadHandTracker() {
+  try {
+    handTracker = await createHandTracker();
+  } catch (error) {
+    handTracker = null;
+    console.error(error);
+  }
+}
+
+function detectHand(now) {
+  const detectInterval = isCompactViewport() ? 190 : 145;
+  if (!handTracker || !lastFace || now < nextHandDetectAt) return;
+  nextHandDetectAt = now + detectInterval;
+
+  if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+  if (video.currentTime === lastHandVideoTime) return;
+  lastHandVideoTime = video.currentTime;
+
+  const gesture = extractNearFaceHand(handTracker.detectForVideo(video, now), lastFace);
+  handSeen = Boolean(gesture);
+  if (gesture && gestureCooldown <= 0 && !pendingGestureQuestion && !calibrationActive) {
+    triggerGestureQuestion();
+  }
 }
 
 function resize() {
@@ -342,6 +413,59 @@ function updateReadingState(dt, activeQuestion) {
   previousEye.z = eye.z;
 }
 
+function updateGestureState(dt, now) {
+  gestureCooldown = Math.max(0, gestureCooldown - dt);
+  gestureTransition = Math.max(0, gestureTransition - dt * 1.45);
+
+  if (pendingGestureQuestion && gestureTransition < 0.58) {
+    pendingGestureQuestion = false;
+    advanceQuestion({ playSound: false, recenter: false });
+  }
+
+  const idleLongEnough = now - lastQuestionChangeAt > 11500;
+  const hintTarget =
+    cameraMode &&
+    document.body.classList.contains("experience-active") &&
+    idleLongEnough &&
+    !handSeen
+      ? 1
+      : 0;
+  handHint = lerp(handHint, hintTarget, 1 - Math.exp(-dt * 1.4));
+}
+
+function updateCalibrationState(dt) {
+  if (!calibrationActive) return;
+
+  const stable = lastFace && Math.hypot(targetEye.x, targetEye.y) < 0.36;
+  calibrationProgress = Math.min(
+    1,
+    Math.max(0, calibrationProgress + dt * (stable ? 0.72 : -0.42)),
+  );
+  if (calibrationMeter) calibrationMeter.style.transform = `scaleX(${calibrationProgress})`;
+
+  if (calibrationProgress >= 1) {
+    calibrationActive = false;
+    document.body.classList.remove("calibrating");
+    setStatus(
+      handTracker ? "Move your head. Raise a hand for another question." : "Move your head",
+      "live",
+    );
+  }
+}
+
+function triggerGestureQuestion() {
+  gestureCooldown = 3.8;
+  gestureTransition = 1;
+  pendingGestureQuestion = true;
+  handHint = 0;
+  readingSmoke = 1;
+  readingHold = Math.max(readingHold, 0.42);
+  readingGrace = 0;
+  revealFlash = 1;
+  audio.playGesture();
+  setStatus("Opening another question", "live");
+}
+
 function clampMotion(value) {
   return Math.min(1.15, Math.max(-1.15, value));
 }
@@ -355,19 +479,77 @@ function isCompactViewport() {
 }
 
 function nextQuestion() {
+  advanceQuestion();
+}
+
+function advanceQuestion({ playSound = true, recenter = true } = {}) {
   if (!scene?.questionPlanes?.length) return;
-  questionIndex = (questionIndex + 1) % scene.questionPlanes.length;
-  pointer.x = 0;
-  pointer.y = 0;
-  Object.assign(targetEye, DEFAULT_EYE);
+
+  if (questionIndex >= scene.questionPlanes.length - 1) {
+    currentQuestionBatch = takeQuestionBatch();
+    scene = createScene(screen, Math.random, getRenderQuality(), currentQuestionBatch);
+    questionIndex = 0;
+  } else {
+    questionIndex += 1;
+  }
+
+  if (recenter) {
+    pointer.x = 0;
+    pointer.y = 0;
+    Object.assign(targetEye, DEFAULT_EYE);
+  }
   readingHold = 0;
   readingGrace = 0;
   readingSmoke = 0;
   revealFlash = 0;
   readingCaptured = false;
   motionStability = 0;
-  audio.playNext();
+  lastQuestionChangeAt = performance.now();
+  if (playSound) audio.playNext();
   setStatus("Next question", "live");
+}
+
+function resetQuestionDeck() {
+  questionDeck = shuffle([...QUESTIONS]);
+  questionDeckCursor = 0;
+}
+
+function takeQuestionBatch(size = 12) {
+  if (!questionDeck.length || questionDeckCursor >= questionDeck.length) resetQuestionDeck();
+
+  const batch = [];
+  while (batch.length < size) {
+    if (questionDeckCursor >= questionDeck.length) resetQuestionDeck();
+    batch.push(questionDeck[questionDeckCursor]);
+    questionDeckCursor += 1;
+  }
+  return batch;
+}
+
+function shuffle(items) {
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
+function switchCameraOff() {
+  if (cameraMode) stopCamera();
+  pointer.x = 0;
+  pointer.y = 0;
+  Object.assign(targetEye, DEFAULT_EYE);
+  setStatus("Camera off. Use mouse or touch.", "idle");
+}
+
+function toggleSound() {
+  audio.toggleMuted();
+  syncSoundButton();
+}
+
+function syncSoundButton() {
+  soundToggleButton.textContent = audio.isMuted() ? "Sound off" : "Sound on";
+  soundToggleButton.setAttribute("aria-pressed", String(!audio.isMuted()));
 }
 
 async function enterExperience() {
@@ -432,6 +614,12 @@ function hydrateQaMode() {
       revealFlash = 0;
       readingCaptured = true;
     }
+  }
+  if (params.get("qaHandHint") === "1") handHint = 1;
+  if (params.get("qaGesture") === "1") {
+    gestureTransition = 1;
+    readingSmoke = 1;
+    revealFlash = 1;
   }
   document.body.classList.add("experience-active");
   document.querySelector("#instructions").hidden = true;

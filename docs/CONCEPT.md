@@ -26,13 +26,13 @@ The visual system should feel precise rather than decorative. It is about cognit
 
 The work begins with an onboarding screen that frames the piece as an expanded-screen artwork and asks the viewer how the chamber should respond. There are three entry modes:
 
-- Camera mode uses MediaPipe Face Landmarker to estimate the viewer's face position.
+- Camera mode uses MediaPipe Face Landmarker to estimate the viewer's face position and MediaPipe Hand Landmarker to recognize a near-face open hand as a question-change gesture.
 - Mouse mode uses pointer position to simulate head movement.
 - Touch mode uses touch position for mobile and tablet navigation.
 
 Looking left, right, up, or down changes the virtual eye position. The tunnel geometry and question constellation shift with motion parallax, making the flat screen behave like a volume that reacts to attention. The fixed structure stays calm while the star field moves through depth, so the sensation is closer to looking into a moving volume than watching a rotating graphic. Text points remain distributed through depth, become readable from the reveal viewpoint, and disperse through parallax when the viewpoint is lost. On phones, the work recommends landscape orientation so the text has more horizontal room and resolves with less strain.
 
-Camera mode treats the first stable face position as neutral. Optional tuning allows the viewer to recenter the view and adjust depth or sensitivity before entering again. Questions change only when the viewer asks for the next one. Once a question resolves, it remains readable for at least three seconds so the viewer can pause with it before moving on. The question set focuses on self-perception, memory, emotional safety, trust, sensitivity, and the viewer's relationship to reality.
+Camera mode begins with a short alignment moment: the portal waits for a stable face before treating that position as neutral. Optional tuning allows the viewer to recenter the view and adjust depth or sensitivity before entering again. Head movement remains the main way to search the space. A raised hand near the face acts as a ritual change gesture: the field briefly spirals, the resolved question scatters, and the next question opens. Mouse, touch, keyboard, and visible controls remain available as accessibility fallbacks. Once a question resolves, it remains readable for at least three seconds so the viewer can pause with it before moving on. The question set focuses on self-perception, memory, emotional safety, trust, sensitivity, and the viewer's relationship to reality.
 
 ## Theme
 

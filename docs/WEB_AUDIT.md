@@ -1,6 +1,6 @@
 # Web Audit
 
-Last updated: May 16, 2026.
+Last updated: May 23, 2026.
 
 ## Scope
 
@@ -21,10 +21,12 @@ https://sinaida-space.github.io/stereolove/
 - The active artwork presents one anamorphic question at a time; the prompt is built from glowing 3D dots, with a thin contour hint that appears from the same reading state when the viewer holds still.
 - The spatial field uses fixed portal geometry without timer-driven structural drift, while slower white and pale-cyan star particles animate outward from the vanishing point to create a controlled flight sensation.
 - Resolved questions remain readable for at least three seconds, dissolve into a smoke-like drift, and trigger a small generated audio cue after the viewer has enabled an interaction mode.
+- Camera mode now includes a short face-alignment calibration moment, a hand gesture for changing questions, and a ghost hand hint after extended inactivity.
+- The active artwork includes `Next question`, `Camera off`, `Sound on/off`, and `Exit` controls as accessibility fallbacks.
 - Mobile portrait screens show a landscape recommendation so the text cloud has enough room to resolve comfortably.
-- The active artwork includes a `Next question` control and keyboard shortcut so questions change intentionally instead of disappearing before they can be read.
+- The active artwork includes a keyboard shortcut so questions change intentionally instead of disappearing before they can be read.
 - Camera mode is opt-in and starts only after a user gesture.
-- The privacy policy describes local camera processing, GitHub Pages hosting, MediaPipe third-party assets, and essential local storage.
+- The privacy policy describes local face and hand camera processing, GitHub Pages hosting, MediaPipe third-party assets, and essential local storage.
 - The cookie notice is limited to essential local storage and links to the privacy policy.
 - Metadata includes page descriptions and canonical URLs.
 

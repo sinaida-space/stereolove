@@ -10,6 +10,7 @@ Stereolove is intentionally lightweight. It is a Vite application with a canvas 
 - `src/questions.js` contains introspective English question prompts rendered as optical constellations.
 - `src/projection.js` contains the head-coupled projection math. This module is pure and unit-tested.
 - `src/face-tracking.js` dynamically loads MediaPipe only when camera mode starts.
+- `src/hand-tracking.js` dynamically loads MediaPipe Hand Landmarker and extracts a conservative near-face hand gesture for question changes.
 - `src/text-sampler.js` samples canvas text into points that can be distributed through depth.
 - `src/config.js` holds shared constants.
 
@@ -23,11 +24,13 @@ The structural geometry avoids autonomous drift. Rings and spokes do not rotate 
 
 The read lock is handled in `src/main.js`. Eye movement is smoothed with time-based damping. When the eye is near the reveal position and remains still, `readingHold` rises and `src/scene.js` strengthens the existing anamorphic point text instead of drawing a separate text layer. Edge samples from the same point cloud form a thin glowing contour hint around the dots. The lock is intentionally forgiving: once the prompt resolves, `readingGrace` keeps it readable for at least three seconds even if the viewer moves. After the hold period, `readingSmoke` moves the points and contour into a smoke-like drift before the text disappears. Compact screens use wider lock thresholds and reduced scatter amplitude to reduce visual strain.
 
+Question order is managed as a shuffled session deck in `src/main.js`. The renderer keeps only a small batch of question point clouds in memory for performance, then builds the next batch when the current one is exhausted. This avoids repeats through the deck without sampling all prompts at startup.
+
 This is different from a stereogram. It does not create binocular disparity. It creates motion parallax and off-axis perspective.
 
 ## Camera Dependency
 
-The first render does not depend on MediaPipe. MediaPipe is loaded dynamically when the user presses `Start camera`. This keeps the artwork usable when camera access, model loading, or a CDN request fails.
+The first render does not depend on MediaPipe. Face tracking is loaded when the user presses `Use camera`; hand tracking loads after the camera stream starts so the main camera experience is not blocked by the larger hand model. Both trackers run on throttled intervals because MediaPipe video detection is synchronous. If hand tracking fails, head tracking and pointer fallback still work.
 
 ## Browser Requirements
 
