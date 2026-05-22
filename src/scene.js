@@ -443,10 +443,13 @@ function drawQuestionConstellation(ctx, question, state) {
   const reveal = activeReveal(question, eye);
   const lock = state.readingHold ?? 0;
   const grace = state.readingGrace > 0 ? 1 : 0;
+  const smoke = state.readingSmoke ?? 0;
   const compactBoost = state.isCompact ? 0.18 : 0;
-  const focus =
+  const focus = Math.max(
     smoothstep(0.1, state.isCompact ? 0.58 : 0.72, lock + compactBoost) *
-    Math.max(reveal, grace * 0.92);
+      Math.max(reveal, grace * 0.98, smoke * 0.64),
+    smoke * 0.46,
+  );
   const cloud = 1 - focus;
 
   ctx.save();
@@ -495,6 +498,8 @@ function drawQuestionConstellation(ctx, question, state) {
 
 function anamorphicQuestionPoint(dot, state, time) {
   const motion = state.eyeMotion ?? { x: 0, y: 0, stretch: 0 };
+  const smoke = state.readingSmoke ?? 0;
+  const smokeAge = 1 - smoke;
   const motionLength = Math.hypot(motion.x, motion.y);
   const dirX = motionLength > 0.02 ? motion.x / motionLength : Math.cos(dot.orbit);
   const dirY = motionLength > 0.02 ? motion.y / motionLength : Math.sin(dot.orbit);
@@ -510,11 +515,29 @@ function anamorphicQuestionPoint(dot, state, time) {
   const scatterX = (dirX * along * stretch + perpX * cross * squeeze) * stretchAmount;
   const scatterY = (dirY * along * stretch + perpY * cross * squeeze) * stretchAmount;
   const compression = 1 + stretchAmount * 0.035;
+  const smokeDrift = smoke > 0 ? smokeAge * smokeAge : 0;
+  const smokeWave = Math.sin(time * 1.6 + dot.orbit * 1.7) * smokeDrift;
 
   return {
-    x: dot.x * compression + scatterX + Math.cos(dot.orbit) * breathing,
-    y: dot.y * compression + scatterY + Math.sin(dot.orbit) * breathing,
-    z: (dot.z + dot.scatterZ * stretchAmount - stretchAmount * dot.elastic * 0.24) * state.depth,
+    x:
+      dot.x * compression +
+      scatterX +
+      Math.cos(dot.orbit) * breathing +
+      dot.scatterX * smokeDrift * 0.18 +
+      smokeWave * 0.04,
+    y:
+      dot.y * compression +
+      scatterY +
+      Math.sin(dot.orbit) * breathing +
+      dot.scatterY * smokeDrift * 0.1 +
+      smokeDrift * 0.18,
+    z:
+      (dot.z +
+        dot.scatterZ * stretchAmount -
+        stretchAmount * dot.elastic * 0.24 +
+        dot.scatterZ * smokeDrift * 1.15 -
+        smokeDrift * dot.elastic * 0.9) *
+      state.depth,
   };
 }
 
@@ -526,10 +549,12 @@ function drawQuestionLock(ctx, question, state) {
 
   const { viewport, dpr, screen, eye, time } = state;
   const reveal = Math.max(activeReveal(question, eye), state.readingGrace > 0 ? 0.92 : 0);
+  const grace = state.readingGrace > 0 ? 1 : 0;
+  const smoke = state.readingSmoke ?? 0;
   const flash = state.revealFlash ?? 0;
   const lockAlpha = smoothstep(0.1, 0.68, lock);
   const hintAlpha = smoothstep(0.28, 0.9, reveal) * 0.24;
-  const alpha = Math.max(lockAlpha, hintAlpha) * reveal;
+  const alpha = Math.max(lockAlpha * reveal, hintAlpha * reveal, grace * 0.92, smoke * 0.58);
   if (alpha <= 0.01) return;
 
   ctx.save();
@@ -546,9 +571,9 @@ function drawQuestionLock(ctx, question, state) {
       0.42,
       state.isCompact ? 2.2 : 3.3,
     );
-    ctx.fillStyle = `rgba(245, 241, 232, ${Math.min(0.78, (0.38 + flash * 0.16) * alpha)})`;
-    ctx.shadowColor = `rgba(${PALETTE.cyan}, ${(0.9 + flash * 0.34) * alpha})`;
-    ctx.shadowBlur = (12 + flash * 14) * dpr;
+    ctx.fillStyle = `rgba(245, 241, 232, ${Math.min(0.86, (0.46 + flash * 0.16) * alpha)})`;
+    ctx.shadowColor = `rgba(${PALETTE.cyan}, ${(1 + flash * 0.34) * alpha})`;
+    ctx.shadowBlur = (14 + flash * 14 + smoke * 10) * dpr;
     ctx.beginPath();
     ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
     ctx.fill();
@@ -560,7 +585,9 @@ function drawQuestionLock(ctx, question, state) {
 }
 
 function drawGlyphOutlineHint(ctx, question, state, alpha, flash) {
-  const { viewport, dpr, screen, eye, depth } = state;
+  const { viewport, dpr, screen, eye, depth, time } = state;
+  const smoke = state.readingSmoke ?? 0;
+  const smokeAge = 1 - smoke;
   const anchor = projectPoint(
     { x: question.x, y: question.y, z: -0.18 * depth },
     eye,
@@ -578,11 +605,14 @@ function drawGlyphOutlineHint(ctx, question, state, alpha, flash) {
   const lineHeight = fontSize * 1.05;
   const maxWidth = Math.min(viewport.width * (state.isCompact ? 0.84 : 0.7), 700 * dpr);
   const totalHeight = (question.lines.length - 1) * lineHeight;
-  const outlineAlpha = smoothstep(0.28, 0.9, alpha) * 0.52;
+  const outlineAlpha = Math.max(smoothstep(0.24, 0.86, alpha) * 0.72, smoke * 0.34);
   if (outlineAlpha <= 0.01) return;
 
   ctx.save();
-  ctx.translate(anchor.x, anchor.y);
+  ctx.translate(
+    anchor.x + Math.sin(time * 1.3) * smokeAge * smoke * 10 * dpr,
+    anchor.y - smokeAge * smoke * 28 * dpr,
+  );
   ctx.rotate(question.rot * 0.18);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -593,16 +623,16 @@ function drawGlyphOutlineHint(ctx, question, state, alpha, flash) {
     const y = index * lineHeight - totalHeight / 2;
     const text = line.toUpperCase();
 
-    ctx.lineWidth = Math.max(0.46, 1.2 * dpr);
-    ctx.strokeStyle = `rgba(${PALETTE.cyan}, ${(0.22 + flash * 0.1) * outlineAlpha})`;
-    ctx.shadowColor = `rgba(${PALETTE.cyan}, ${(0.9 + flash * 0.24) * outlineAlpha})`;
-    ctx.shadowBlur = (18 + flash * 18) * dpr;
+    ctx.lineWidth = Math.max(0.54, 1.46 * dpr);
+    ctx.strokeStyle = `rgba(${PALETTE.cyan}, ${(0.34 + flash * 0.12) * outlineAlpha})`;
+    ctx.shadowColor = `rgba(${PALETTE.cyan}, ${(1 + flash * 0.28) * outlineAlpha})`;
+    ctx.shadowBlur = (20 + flash * 18 + smoke * 22) * dpr;
     ctx.strokeText(text, 0, y, maxWidth);
 
-    ctx.lineWidth = Math.max(0.28, 0.44 * dpr);
-    ctx.strokeStyle = `rgba(245, 241, 232, ${(0.36 + flash * 0.12) * outlineAlpha})`;
-    ctx.shadowColor = `rgba(245, 241, 232, ${(0.38 + flash * 0.14) * outlineAlpha})`;
-    ctx.shadowBlur = (4 + flash * 5) * dpr;
+    ctx.lineWidth = Math.max(0.3, 0.56 * dpr);
+    ctx.strokeStyle = `rgba(245, 241, 232, ${(0.48 + flash * 0.14) * outlineAlpha})`;
+    ctx.shadowColor = `rgba(245, 241, 232, ${(0.52 + flash * 0.16) * outlineAlpha})`;
+    ctx.shadowBlur = (5 + flash * 5 + smoke * 10) * dpr;
     ctx.strokeText(text, 0, y, maxWidth);
   });
 
