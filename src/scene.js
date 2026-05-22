@@ -45,7 +45,7 @@ export function createFrames(screen, random = Math.random) {
       x: 0,
       y: 0,
       rot: 0,
-      opacity: 0.08 + (1 - depth) * 0.2 + (i % 6 === 0 ? 0.12 : 0),
+      opacity: 0.035 + (1 - depth) * 0.12 + (i % 6 === 0 ? 0.055 : 0),
       color: i % 3 === 0 ? PALETTE.cyan : BACKGROUND_COLORS[i % BACKGROUND_COLORS.length],
       facet: 0,
       near: 1 - depth,
@@ -66,8 +66,8 @@ function createSpokes(screen, random) {
       x: point.x + wobble,
       y: point.y + wobble * 0.62,
       color: i % 4 === 0 ? PALETTE.cyan : BACKGROUND_COLORS[i % BACKGROUND_COLORS.length],
-      alpha: 0.05 + random() * 0.1,
-      width: 0.22 + random() * 0.58,
+      alpha: 0.026 + random() * 0.064,
+      width: 0.12 + random() * 0.34,
     });
   }
 
@@ -109,26 +109,34 @@ function createField(screen, random) {
 
 function createQuestionPlanes(screen, random) {
   const picked = shuffle([...QUESTIONS], random).slice(0, 12);
+  const touchFriendly =
+    globalThis.innerWidth <= 820 ||
+    globalThis.innerHeight <= 480 ||
+    globalThis.matchMedia?.("(pointer: coarse)").matches === true;
+  const revealRangeX = touchFriendly ? 0.34 : 0.52;
+  const revealRangeY = touchFriendly ? 0.2 : 0.3;
 
   return picked.map((question, index) => {
     const x = Math.sin(index * 1.47) * screen.width * 0.1;
     const y = Math.cos(index * 1.21) * screen.height * 0.09;
     const rot = (random() - 0.5) * 0.09;
     const revealEye = {
-      x: DEFAULT_EYE.x,
-      y: DEFAULT_EYE.y,
+      x: (random() - 0.5) * revealRangeX,
+      y: (random() - 0.5) * revealRangeY,
       z: DEFAULT_EYE.z,
     };
+    const points = createAnamorphicQuestionPoints(
+      sampleQuestionPoints(question, random),
+      { x, y, rot, revealEye },
+      screen,
+      random,
+    );
 
     return {
       question,
       lines: wrapQuestion(question),
-      points: createAnamorphicQuestionPoints(
-        sampleQuestionPoints(question, random),
-        { x, y, rot, revealEye },
-        screen,
-        random,
-      ),
+      points,
+      outlinePoints: points.filter((point) => point.edge).sort((a, b) => a.edgeOrder - b.edgeOrder),
       x,
       y,
       rot,
@@ -163,11 +171,15 @@ function createAnamorphicQuestionPoints(samples, question, screen, random) {
     return {
       ...world,
       weight: sample.weight,
-      size: 0.82 + random() * 1.45,
+      edge: sample.edge,
+      edgeOrder: sample.edgeOrder,
+      sampleX: sample.sampleX,
+      sampleY: sample.sampleY,
+      size: sample.edge ? 1.1 + random() * 1.42 : 0.76 + random() * 1.32,
       colorShift: index % TEXT_COLORS.length,
-      scatterX: (random() - 0.5) * screen.width * (0.34 + random() * 0.52),
-      scatterY: (random() - 0.5) * screen.height * (0.28 + random() * 0.48),
-      scatterZ: (random() - 0.5) * 4.6,
+      scatterX: (random() - 0.5) * screen.width * (0.045 + random() * 0.08),
+      scatterY: (random() - 0.5) * screen.height * (0.04 + random() * 0.065),
+      scatterZ: (random() - 0.5) * 1.25,
       elastic: 0.35 + random() * 1.15,
       orbit: random() * Math.PI * 2,
     };
@@ -177,35 +189,67 @@ function createAnamorphicQuestionPoints(samples, question, screen, random) {
 function sampleQuestionPoints(text, random) {
   const canvas = document.createElement("canvas");
   canvas.width = 980;
-  canvas.height = 440;
+  canvas.height = 560;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "#fff";
-  ctx.font = '760 50px "Avenir Next", "Helvetica Neue", Arial, sans-serif';
+  ctx.font = '760 68px "Avenir Next", "Helvetica Neue", Arial, sans-serif';
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  const lines = wrapCanvasText(ctx, text.toUpperCase(), 660);
-  const lineHeight = 58;
+  const lines = wrapCanvasText(ctx, text.toUpperCase(), 540);
+  const lineHeight = 76;
   const startY = canvas.height / 2 - ((lines.length - 1) * lineHeight) / 2;
   lines.forEach((line, index) => ctx.fillText(line, canvas.width / 2, startY + index * lineHeight));
 
   const image = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-  const candidates = [];
+  const fillCandidates = [];
+  const edgeCandidates = [];
+  let edgeOrder = 0;
   for (let y = 0; y < canvas.height; y += 4) {
     for (let x = 0; x < canvas.width; x += 4) {
       if (image[(y * canvas.width + x) * 4] > 80 && random() > 0.08) {
-        candidates.push({
+        const edge = isTextEdge(image, canvas.width, canvas.height, x, y);
+        const sample = {
           x: x / canvas.width - 0.5,
           y: -(y / canvas.height - 0.5),
           weight: random(),
-        });
+          edge,
+          edgeOrder: edge ? edgeOrder : -1,
+          sampleX: x / canvas.width,
+          sampleY: y / canvas.height,
+        };
+
+        if (edge) {
+          edgeOrder += 1;
+          edgeCandidates.push(sample);
+        } else {
+          fillCandidates.push(sample);
+        }
       }
     }
   }
 
-  return shuffle(candidates, random).slice(0, 1080);
+  const outline = shuffle(edgeCandidates, random).slice(0, 840);
+  const fill = shuffle(fillCandidates, random).slice(0, 1260);
+  return shuffle([...outline, ...fill], random);
+}
+
+function isTextEdge(image, width, height, x, y) {
+  const offsets = [
+    [-8, 0],
+    [8, 0],
+    [0, -8],
+    [0, 8],
+  ];
+
+  return offsets.some(([dx, dy]) => {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (nx < 0 || ny < 0 || nx >= width || ny >= height) return true;
+    return image[(ny * width + nx) * 4] < 80;
+  });
 }
 
 function drawVoid(ctx, state) {
@@ -307,10 +351,10 @@ function drawTunnel(ctx, scene, state) {
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
 
-  drawSpokes(ctx, spokes, state, 5.2, 0.055);
-  drawFrames(ctx, frames, state, 5.4, 0.055);
-  drawSpokes(ctx, spokes, state, 1.2, 0.2);
-  drawFrames(ctx, frames, state, 1, 0.64);
+  drawSpokes(ctx, spokes, state, 2.9, 0.04);
+  drawFrames(ctx, frames, state, 2.8, 0.04);
+  drawSpokes(ctx, spokes, state, 0.76, 0.15);
+  drawFrames(ctx, frames, state, 0.58, 0.46);
 
   ctx.restore();
 }
@@ -322,7 +366,7 @@ function drawFrames(ctx, frames, state, widthScale = 1, alphaScale = 1) {
     const z = frame.z * depth;
     const corners = framePoints(frame, z);
     const nearGlow = 0.45 + frame.near * 1.65;
-    const lineWidth = (frame.facet === 0 ? 1.08 : 0.58) * widthScale * nearGlow;
+    const lineWidth = (frame.facet === 0 ? 0.58 : 0.34) * widthScale * nearGlow;
 
     for (let i = 0; i < corners.length; i += 1) {
       drawWorldLine(
@@ -415,25 +459,30 @@ function drawQuestionConstellation(ctx, question, state) {
   ]) {
     for (const dot of question.points) {
       const color = TEXT_COLORS[dot.colorShift % TEXT_COLORS.length];
-      const world = elasticQuestionPoint(dot, state, focus, time);
+      const world = anamorphicQuestionPoint(dot, state, time);
       const projected = projectPoint(world, eye, screen, viewport, dpr);
       if (!projected.visible) continue;
 
-      const lockFocus = 1 - focus * 0.74;
-      const holdFade = (state.isCompact ? 0.16 : 0.22) + cloud * (state.isCompact ? 0.66 : 0.78);
-      const glowFocus = (state.isCompact ? 0.3 : 0.38) + cloud * (state.isCompact ? 0.5 : 0.62);
+      const twinkle = 0.86 + Math.sin(time * 1.25 + dot.orbit) * 0.14;
+      const edgeSignal = dot.edge ? 1.34 + focus * 0.46 : 1;
+      const lockFocus = dot.edge ? 1 + focus * 0.34 : 1 - focus * 0.44;
+      const holdFade = (0.36 + cloud * 0.48 + focus * (dot.edge ? 0.48 : 0.08)) * twinkle;
+      const glowFocus = (state.isCompact ? 0.36 : 0.44) + cloud * 0.34 + focus * 0.28;
+      const compactScale = state.isCompact ? 0.72 : 1;
       const size = clamp(
         dot.size *
           projected.scale *
-          (1 + Math.max(reveal, grace * 0.86) * (state.isCompact ? 2.05 : 2.35) + cloud * 0.62) *
+          (1 + Math.max(reveal, grace * 0.86) * (state.isCompact ? 1.9 : 2.18) + cloud * 0.48) *
           pass.scale *
           glowFocus *
-          lockFocus,
+          lockFocus *
+          edgeSignal *
+          compactScale,
         0.36,
-        focus > 0.62 ? (state.isCompact ? 1.75 : 2.1) : state.isCompact ? 5.8 : 7.2,
+        focus > 0.62 ? (state.isCompact ? 1.45 : 2.45) : state.isCompact ? 4.2 : 7,
       );
       ctx.fillStyle = `rgba(${color}, ${
-        pass.alpha * (0.44 + Math.max(reveal, grace * 0.72)) * holdFade
+        pass.alpha * (0.46 + Math.max(reveal, grace * 0.72)) * holdFade
       })`;
       ctx.beginPath();
       ctx.arc(projected.x, projected.y, size, 0, Math.PI * 2);
@@ -444,39 +493,28 @@ function drawQuestionConstellation(ctx, question, state) {
   ctx.restore();
 }
 
-function elasticQuestionPoint(dot, state, focus, time) {
+function anamorphicQuestionPoint(dot, state, time) {
   const motion = state.eyeMotion ?? { x: 0, y: 0, stretch: 0 };
   const motionLength = Math.hypot(motion.x, motion.y);
   const dirX = motionLength > 0.02 ? motion.x / motionLength : Math.cos(dot.orbit);
   const dirY = motionLength > 0.02 ? motion.y / motionLength : Math.sin(dot.orbit);
   const perpX = -dirY;
   const perpY = dirX;
-  const cloud = 1 - focus;
-  const compact = state.isCompact ? 0.64 : 1;
-  const scatterScale = state.isCompact ? 0.58 : 1;
-  const stretch = 1 + motion.stretch * (0.34 + cloud * 0.9) * dot.elastic * compact;
-  const squeeze = 1 - motion.stretch * (0.05 + focus * 0.12) * compact;
+  const compact = state.isCompact ? 0.42 : 0.72;
+  const stretchAmount = motion.stretch * compact;
+  const stretch = 1 + stretchAmount * 0.62 * dot.elastic;
+  const squeeze = 1 - stretchAmount * 0.14;
   const along = dot.scatterX * dirX + dot.scatterY * dirY;
   const cross = dot.scatterX * perpX + dot.scatterY * perpY;
-  const breathing = Math.sin(time * 0.8 + dot.orbit) * cloud * 0.035;
-  const scatterX =
-    (dirX * along * stretch +
-      perpX * cross * squeeze +
-      dirX * motion.stretch * dot.elastic * 0.34) *
-    cloud *
-    scatterScale;
-  const scatterY =
-    (dirY * along * stretch + perpY * cross * squeeze + dirY * motion.stretch * dot.elastic * 0.2) *
-    cloud *
-    scatterScale;
-  const compression = 1 - focus * 0.08 + motion.stretch * cloud * 0.08;
+  const breathing = Math.sin(time * 0.82 + dot.orbit) * stretchAmount * 0.018;
+  const scatterX = (dirX * along * stretch + perpX * cross * squeeze) * stretchAmount;
+  const scatterY = (dirY * along * stretch + perpY * cross * squeeze) * stretchAmount;
+  const compression = 1 + stretchAmount * 0.035;
 
   return {
     x: dot.x * compression + scatterX + Math.cos(dot.orbit) * breathing,
     y: dot.y * compression + scatterY + Math.sin(dot.orbit) * breathing,
-    z:
-      (dot.z + dot.scatterZ * cloud * scatterScale - motion.stretch * cloud * dot.elastic * 1.15) *
-      state.depth,
+    z: (dot.z + dot.scatterZ * stretchAmount - stretchAmount * dot.elastic * 0.24) * state.depth,
   };
 }
 
@@ -484,11 +522,47 @@ function drawQuestionLock(ctx, question, state) {
   if (!question) return;
 
   const lock = state.readingHold ?? 0;
-  if (lock <= 0.03) return;
+  if (lock <= 0.04 || !question.outlinePoints.length) return;
 
+  const { viewport, dpr, screen, eye, time } = state;
+  const reveal = Math.max(activeReveal(question, eye), state.readingGrace > 0 ? 0.92 : 0);
+  const flash = state.revealFlash ?? 0;
+  const lockAlpha = smoothstep(0.1, 0.68, lock);
+  const hintAlpha = smoothstep(0.28, 0.9, reveal) * 0.24;
+  const alpha = Math.max(lockAlpha, hintAlpha) * reveal;
+  if (alpha <= 0.01) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+
+  for (const dot of question.outlinePoints) {
+    const world = anamorphicQuestionPoint(dot, state, time);
+    const projected = projectPoint(world, eye, screen, viewport, dpr);
+    if (!projected.visible) continue;
+
+    const compactScale = state.isCompact ? 0.68 : 1;
+    const radius = clamp(
+      dot.size * projected.scale * (1.7 + flash * 0.55) * compactScale,
+      0.42,
+      state.isCompact ? 2.2 : 3.3,
+    );
+    ctx.fillStyle = `rgba(245, 241, 232, ${Math.min(0.78, (0.38 + flash * 0.16) * alpha)})`;
+    ctx.shadowColor = `rgba(${PALETTE.cyan}, ${(0.9 + flash * 0.34) * alpha})`;
+    ctx.shadowBlur = (12 + flash * 14) * dpr;
+    ctx.beginPath();
+    ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  drawGlyphOutlineHint(ctx, question, state, alpha, flash);
+
+  ctx.restore();
+}
+
+function drawGlyphOutlineHint(ctx, question, state, alpha, flash) {
   const { viewport, dpr, screen, eye, depth } = state;
   const anchor = projectPoint(
-    { x: question.x, y: question.y, z: -2.0 * depth },
+    { x: question.x, y: question.y, z: -0.18 * depth },
     eye,
     screen,
     viewport,
@@ -496,45 +570,39 @@ function drawQuestionLock(ctx, question, state) {
   );
   if (!anchor.visible) return;
 
-  const reveal = Math.max(activeReveal(question, eye), state.readingGrace > 0 ? 0.92 : 0);
-  const flash = state.revealFlash ?? 0;
-  const alpha = smoothstep(0.08, 0.56, lock) * reveal;
-  if (alpha <= 0.01) return;
-
-  const fontSize = clamp(anchor.scale * 92, 23 * dpr, 54 * dpr);
-  const lineHeight = fontSize * 1.04;
-  const maxWidth = Math.min(viewport.width * 0.62, 720 * dpr);
+  const fontSize = clamp(
+    anchor.scale * (state.isCompact ? 70 : 92),
+    18 * dpr,
+    (state.isCompact ? 38 : 62) * dpr,
+  );
+  const lineHeight = fontSize * 1.05;
+  const maxWidth = Math.min(viewport.width * (state.isCompact ? 0.84 : 0.7), 700 * dpr);
   const totalHeight = (question.lines.length - 1) * lineHeight;
+  const outlineAlpha = smoothstep(0.28, 0.9, alpha) * 0.52;
+  if (outlineAlpha <= 0.01) return;
 
   ctx.save();
   ctx.translate(anchor.x, anchor.y);
-  ctx.rotate(question.rot * 0.24);
+  ctx.rotate(question.rot * 0.18);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `620 ${fontSize}px "Avenir Next", "Helvetica Neue", Arial, sans-serif`;
+  ctx.font = `650 ${fontSize}px "Avenir Next", "Helvetica Neue", Arial, sans-serif`;
   ctx.globalCompositeOperation = "lighter";
 
   question.lines.forEach((line, index) => {
     const y = index * lineHeight - totalHeight / 2;
     const text = line.toUpperCase();
 
-    ctx.globalCompositeOperation = "source-over";
-    ctx.lineWidth = Math.max(1.6, 6.8 * dpr);
-    ctx.strokeStyle = `rgba(5, 6, 9, ${0.62 * alpha})`;
-    ctx.shadowBlur = 0;
+    ctx.lineWidth = Math.max(0.46, 1.2 * dpr);
+    ctx.strokeStyle = `rgba(${PALETTE.cyan}, ${(0.22 + flash * 0.1) * outlineAlpha})`;
+    ctx.shadowColor = `rgba(${PALETTE.cyan}, ${(0.9 + flash * 0.24) * outlineAlpha})`;
+    ctx.shadowBlur = (18 + flash * 18) * dpr;
     ctx.strokeText(text, 0, y, maxWidth);
 
-    ctx.globalCompositeOperation = "lighter";
-    ctx.lineWidth = Math.max(1.2, 4.4 * dpr);
-    ctx.strokeStyle = `rgba(${PALETTE.cyan}, ${(0.22 + flash * 0.1) * alpha})`;
-    ctx.shadowColor = `rgba(${PALETTE.cyan}, ${(0.82 + flash * 0.26) * alpha})`;
-    ctx.shadowBlur = (22 + flash * 14) * dpr;
-    ctx.strokeText(text, 0, y, maxWidth);
-
-    ctx.lineWidth = Math.max(0.82, 1.22 * dpr);
-    ctx.strokeStyle = `rgba(245, 241, 232, ${Math.min(1, (0.98 + flash * 0.18) * alpha)})`;
-    ctx.shadowColor = `rgba(245, 241, 232, ${(0.52 + flash * 0.16) * alpha})`;
-    ctx.shadowBlur = (6 + flash * 4) * dpr;
+    ctx.lineWidth = Math.max(0.28, 0.44 * dpr);
+    ctx.strokeStyle = `rgba(245, 241, 232, ${(0.36 + flash * 0.12) * outlineAlpha})`;
+    ctx.shadowColor = `rgba(245, 241, 232, ${(0.38 + flash * 0.14) * outlineAlpha})`;
+    ctx.shadowBlur = (4 + flash * 5) * dpr;
     ctx.strokeText(text, 0, y, maxWidth);
   });
 
@@ -577,7 +645,7 @@ function drawWorldLine(ctx, a, b, state, color, alpha, lineWidth = 1) {
   );
   const headLight = clamp(1 + Math.hypot(state.eye.x, state.eye.y) * 0.08, 1, 1.18);
   ctx.strokeStyle = `rgba(${color}, ${clamp(alpha * (0.72 + edgeLight * 0.65) * headLight, 0, 0.86)})`;
-  ctx.lineWidth = clamp(lineWidth * dpr * (0.56 + scale * 1.25 + edgeLight * 0.38), 0.18, 6.5);
+  ctx.lineWidth = clamp(lineWidth * dpr * (0.42 + scale * 0.92 + edgeLight * 0.22), 0.12, 3.2);
   ctx.beginPath();
   ctx.moveTo(pa.x, pa.y);
   ctx.lineTo(pb.x, pb.y);
@@ -623,7 +691,7 @@ function wrapQuestion(text) {
   const words = text.split(" ");
   const lines = [];
   let line = "";
-  const maxChars = 18;
+  const maxChars = 15;
 
   for (const word of words) {
     const test = line ? `${line} ${word}` : word;
@@ -635,7 +703,7 @@ function wrapQuestion(text) {
     }
   }
   if (line) lines.push(line);
-  return lines.slice(0, 4);
+  return lines.slice(0, 5);
 }
 
 function wrapCanvasText(ctx, text, maxWidth) {
@@ -653,7 +721,7 @@ function wrapCanvasText(ctx, text, maxWidth) {
     }
   }
   if (line) lines.push(line);
-  return lines.slice(0, 4);
+  return lines.slice(0, 5);
 }
 
 function shuffle(items, random) {
