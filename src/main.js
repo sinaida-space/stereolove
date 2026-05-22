@@ -5,7 +5,7 @@ import { createScene, drawScene, selectActiveQuestion } from "./scene.js";
 import { deriveFaceEye, derivePointerEye, lerp, makeScreen } from "./projection.js";
 
 const canvas = document.querySelector("#stage");
-const ctx = canvas.getContext("2d", { alpha: false });
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
 const video = document.querySelector("#webcam");
 const statusDot = document.querySelector("#statusDot");
 const statusText = document.querySelector("#statusText");
@@ -34,6 +34,8 @@ let lastVideoTime = -1;
 let lastFace = null;
 let startTime = performance.now();
 let previousFrameTime = startTime;
+let nextFaceDetectAt = 0;
+let nextReadoutAt = 0;
 let questionIndex = 0;
 let motionStability = 0;
 let readingHold = 0;
@@ -53,7 +55,7 @@ const neutralFace = { x: 0.5, y: 0.48, eyeSep: 0.17, ready: false };
 const audio = createAudioController();
 
 resize();
-scene = createScene(screen);
+scene = createScene(screen, Math.random, getRenderQuality());
 hydrateCookieBanner();
 hydrateQaMode();
 animate();
@@ -128,7 +130,7 @@ window.addEventListener("pointerleave", () => {
 
 window.addEventListener("resize", () => {
   resize();
-  scene = createScene(screen);
+  scene = createScene(screen, Math.random, getRenderQuality());
 });
 
 async function startCamera({ enterOnReady = false } = {}) {
@@ -137,7 +139,7 @@ async function startCamera({ enterOnReady = false } = {}) {
   try {
     faceTracker = await createFaceTracker();
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user", width: { ideal: 960 }, height: { ideal: 540 } },
+      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } },
       audio: false,
     });
 
@@ -175,8 +177,11 @@ function stopCamera() {
 function animate() {
   requestAnimationFrame(animate);
   const now = performance.now();
+  const frameInterval = isCompactViewport() ? 1000 / 34 : 1000 / 52;
+  if (now - previousFrameTime < frameInterval) return;
+
   const time = (now - startTime) * 0.001;
-  const dt = Math.min((now - previousFrameTime) * 0.001, 0.05);
+  const dt = Math.min((now - previousFrameTime) * 0.001, 0.07);
   previousFrameTime = now;
 
   if (cameraMode) detectFace(now);
@@ -203,16 +208,24 @@ function animate() {
     readingSmoke,
     revealFlash,
     isCompact: isCompactViewport(),
+    quality: getRenderQuality(),
     eyeMotion: {
       x: motionX,
       y: motionY,
       stretch: motionStretch,
     },
   });
-  updateReadout();
+  if (now >= nextReadoutAt) {
+    updateReadout();
+    nextReadoutAt = now + 180;
+  }
 }
 
 function detectFace(now) {
+  const detectInterval = isCompactViewport() ? 115 : 75;
+  if (now < nextFaceDetectAt) return;
+  nextFaceDetectAt = now + detectInterval;
+
   if (!faceTracker || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
   if (video.currentTime === lastVideoTime) return;
 
@@ -241,7 +254,7 @@ function detectFace(now) {
 }
 
 function resize() {
-  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  dpr = Math.min(window.devicePixelRatio || 1, isCompactViewport() ? 1 : 1.35);
   viewport = {
     width: Math.floor(window.innerWidth * dpr),
     height: Math.floor(window.innerHeight * dpr),
@@ -251,6 +264,13 @@ function resize() {
   canvas.style.width = `${window.innerWidth}px`;
   canvas.style.height = `${window.innerHeight}px`;
   screen = makeScreen(window.innerWidth, window.innerHeight);
+}
+
+function getRenderQuality() {
+  const compact = isCompactViewport();
+  const cores = navigator.hardwareConcurrency || 4;
+  if (compact) return cores <= 4 ? "mobileLow" : "mobile";
+  return cores <= 4 ? "balanced" : "high";
 }
 
 function setStatus(text, state) {
