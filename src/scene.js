@@ -6,12 +6,19 @@ const TUNNEL_DEPTH = -17.5;
 const STAR_DEPTH = 17.8;
 const BACKGROUND_COLORS = ["245, 241, 232", "198, 248, 255", "94, 242, 255"];
 const TEXT_COLORS = ["64, 232, 255", "94, 242, 255", "142, 252, 255", "204, 255, 255"];
+const QUALITY_PRESETS = {
+  high: { frames: 34, spokes: 42, stars: 2300, outline: 620, fill: 900, sampleStep: 5 },
+  balanced: { frames: 24, spokes: 34, stars: 1700, outline: 520, fill: 720, sampleStep: 5 },
+  mobile: { frames: 18, spokes: 24, stars: 950, outline: 360, fill: 520, sampleStep: 6 },
+  mobileLow: { frames: 14, spokes: 18, stars: 650, outline: 300, fill: 380, sampleStep: 7 },
+};
 
-export function createScene(screen, random = Math.random) {
-  const frames = createFrames(screen, random);
-  const spokes = createSpokes(screen, random);
-  const field = createField(screen, random);
-  const questionPlanes = createQuestionPlanes(screen, random);
+export function createScene(screen, random = Math.random, quality = "high") {
+  const preset = QUALITY_PRESETS[quality] ?? QUALITY_PRESETS.high;
+  const frames = createFrames(screen, random, preset);
+  const spokes = createSpokes(screen, random, preset);
+  const field = createField(screen, random, preset);
+  const questionPlanes = createQuestionPlanes(screen, random, preset);
 
   return { frames, spokes, field, questionPlanes };
 }
@@ -32,9 +39,10 @@ export function selectActiveQuestion(questionPlanes, index = 0) {
   return questionPlanes[Math.abs(Math.floor(index)) % questionPlanes.length];
 }
 
-export function createFrames(screen, random = Math.random) {
-  return Array.from({ length: 38 }, (_, i) => {
-    const depth = i / 37;
+export function createFrames(screen, random = Math.random, preset = QUALITY_PRESETS.high) {
+  const count = preset.frames;
+  return Array.from({ length: count }, (_, i) => {
+    const depth = count <= 1 ? 0 : i / (count - 1);
     const z = -0.55 - depth * Math.abs(TUNNEL_DEPTH);
     const shimmer = (random() - 0.5) * 0.014;
 
@@ -53,9 +61,9 @@ export function createFrames(screen, random = Math.random) {
   });
 }
 
-function createSpokes(screen, random) {
+function createSpokes(screen, random, preset = QUALITY_PRESETS.high) {
   const spokes = [];
-  const count = 56;
+  const count = preset.spokes;
 
   for (let i = 0; i < count; i += 1) {
     const side = i % 4;
@@ -81,8 +89,8 @@ function perimeterPoint(screen, side, t) {
   return { x: -screen.width * 0.56, y: (t - 0.5) * screen.height * 1.12 };
 }
 
-function createField(screen, random) {
-  return Array.from({ length: 5400 }, (_, i) => {
+function createField(screen, random, preset = QUALITY_PRESETS.high) {
+  return Array.from({ length: preset.stars }, (_, i) => {
     const z = -0.55 - random() * STAR_DEPTH;
     const angle = random() * Math.PI * 2;
     const shell = Math.pow(random(), 0.28);
@@ -107,7 +115,7 @@ function createField(screen, random) {
   });
 }
 
-function createQuestionPlanes(screen, random) {
+function createQuestionPlanes(screen, random, preset = QUALITY_PRESETS.high) {
   const picked = shuffle([...QUESTIONS], random).slice(0, 12);
   const touchFriendly =
     globalThis.innerWidth <= 820 ||
@@ -126,7 +134,7 @@ function createQuestionPlanes(screen, random) {
       z: DEFAULT_EYE.z,
     };
     const points = createAnamorphicQuestionPoints(
-      sampleQuestionPoints(question, random),
+      sampleQuestionPoints(question, random, preset),
       { x, y, rot, revealEye },
       screen,
       random,
@@ -186,7 +194,7 @@ function createAnamorphicQuestionPoints(samples, question, screen, random) {
   });
 }
 
-function sampleQuestionPoints(text, random) {
+function sampleQuestionPoints(text, random, preset = QUALITY_PRESETS.high) {
   const canvas = document.createElement("canvas");
   canvas.width = 980;
   canvas.height = 560;
@@ -207,8 +215,9 @@ function sampleQuestionPoints(text, random) {
   const fillCandidates = [];
   const edgeCandidates = [];
   let edgeOrder = 0;
-  for (let y = 0; y < canvas.height; y += 4) {
-    for (let x = 0; x < canvas.width; x += 4) {
+  const step = preset.sampleStep;
+  for (let y = 0; y < canvas.height; y += step) {
+    for (let x = 0; x < canvas.width; x += step) {
       if (image[(y * canvas.width + x) * 4] > 80 && random() > 0.08) {
         const edge = isTextEdge(image, canvas.width, canvas.height, x, y);
         const sample = {
@@ -231,8 +240,8 @@ function sampleQuestionPoints(text, random) {
     }
   }
 
-  const outline = shuffle(edgeCandidates, random).slice(0, 840);
-  const fill = shuffle(fillCandidates, random).slice(0, 1260);
+  const outline = shuffle(edgeCandidates, random).slice(0, preset.outline);
+  const fill = shuffle(fillCandidates, random).slice(0, preset.fill);
   return shuffle([...outline, ...fill], random);
 }
 
@@ -455,11 +464,18 @@ function drawQuestionConstellation(ctx, question, state) {
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
 
-  for (const pass of [
-    { alpha: 0.07, scale: 4.2 },
-    { alpha: 0.18, scale: 1.85 },
-    { alpha: 0.72, scale: 0.82 },
-  ]) {
+  const passes = state.isCompact
+    ? [
+        { alpha: 0.16, scale: 2.15 },
+        { alpha: 0.76, scale: 0.9 },
+      ]
+    : [
+        { alpha: 0.07, scale: 3.4 },
+        { alpha: 0.18, scale: 1.65 },
+        { alpha: 0.72, scale: 0.82 },
+      ];
+
+  for (const pass of passes) {
     for (const dot of question.points) {
       const color = TEXT_COLORS[dot.colorShift % TEXT_COLORS.length];
       const world = anamorphicQuestionPoint(dot, state, time);
@@ -560,7 +576,30 @@ function drawQuestionLock(ctx, question, state) {
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
 
-  for (const dot of question.outlinePoints) {
+  for (const pass of [
+    { radius: 3.4, alpha: 0.08 + flash * 0.04 },
+    { radius: 1, alpha: 0.52 + flash * 0.12 },
+  ]) {
+    if (state.isCompact && pass.radius > 1.2) continue;
+    for (const dot of question.outlinePoints) {
+      const world = anamorphicQuestionPoint(dot, state, time);
+      const projected = projectPoint(world, eye, screen, viewport, dpr);
+      if (!projected.visible) continue;
+
+      const compactScale = state.isCompact ? 0.72 : 1;
+      const radius = clamp(
+        dot.size * projected.scale * (1.65 + flash * 0.5) * compactScale * pass.radius,
+        0.42,
+        pass.radius > 1.2 ? (state.isCompact ? 3.2 : 7.4) : state.isCompact ? 2.0 : 3.1,
+      );
+      ctx.fillStyle = `rgba(245, 241, 232, ${Math.min(0.78, pass.alpha * alpha)})`;
+      ctx.beginPath();
+      ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  for (const dot of question.outlinePoints.slice(0, state.isCompact ? 140 : 260)) {
     const world = anamorphicQuestionPoint(dot, state, time);
     const projected = projectPoint(world, eye, screen, viewport, dpr);
     if (!projected.visible) continue;
@@ -571,9 +610,7 @@ function drawQuestionLock(ctx, question, state) {
       0.42,
       state.isCompact ? 2.2 : 3.3,
     );
-    ctx.fillStyle = `rgba(245, 241, 232, ${Math.min(0.86, (0.46 + flash * 0.16) * alpha)})`;
-    ctx.shadowColor = `rgba(${PALETTE.cyan}, ${(1 + flash * 0.34) * alpha})`;
-    ctx.shadowBlur = (14 + flash * 14 + smoke * 10) * dpr;
+    ctx.fillStyle = `rgba(${PALETTE.cyan}, ${Math.min(0.62, (0.32 + flash * 0.12) * alpha)})`;
     ctx.beginPath();
     ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
     ctx.fill();

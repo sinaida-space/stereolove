@@ -83,7 +83,6 @@ input {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(10, 12, 15, 0.62);
-  backdrop-filter: blur(18px);
 }
 
 .site-nav a {
@@ -123,7 +122,6 @@ input {
   border-radius: 8px;
   background: var(--panel);
   color: var(--ink);
-  backdrop-filter: blur(18px);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
   transform: translate(-50%, -50%);
 }
@@ -308,7 +306,6 @@ body.camera-on #webcam {
   min-height: 36px;
   padding: 0 12px;
   background: rgba(5, 6, 9, 0.72);
-  backdrop-filter: blur(12px);
 }
 
 .orientation-notice {
@@ -323,7 +320,6 @@ body.camera-on #webcam {
   border-radius: 8px;
   background: rgba(5, 6, 9, 0.82);
   color: rgba(245, 241, 232, 0.88);
-  backdrop-filter: blur(18px);
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.38);
 }
 
@@ -373,7 +369,6 @@ body.camera-on #webcam {
   border-radius: 8px;
   background: var(--panel-solid);
   color: var(--ink);
-  backdrop-filter: blur(18px);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
 }
 
@@ -461,7 +456,6 @@ body.experience-active.fullscreen-unavailable .experience-toolbar {
   left: auto;
   right: auto;
   background: rgba(7, 8, 10, 0.78);
-  backdrop-filter: blur(18px);
 }
 
 .legal-page {
