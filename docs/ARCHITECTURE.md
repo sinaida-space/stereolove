@@ -7,7 +7,7 @@ Stereolove is intentionally lightweight. It is a Vite application with a canvas 
 - `src/main.js` wires DOM controls, camera state, pointer fallback, resize handling, and the animation loop.
 - `src/audio.js` creates quiet Web Audio ambience and short reveal or navigation cues after a user gesture.
 - `src/scene.js` creates and renders the op-art spatial field: screen aperture, centered portal rings, perspective spokes, monochrome particles, glow passes, and active cyan anamorphic question constellations.
-- `src/questions.js` contains the English question prompts rendered as optical constellations.
+- `src/questions.js` contains introspective English question prompts rendered as optical constellations.
 - `src/projection.js` contains the head-coupled projection math. This module is pure and unit-tested.
 - `src/face-tracking.js` dynamically loads MediaPipe only when camera mode starts.
 - `src/text-sampler.js` samples canvas text into points that can be distributed through depth.
@@ -21,7 +21,7 @@ The scene geometry is built around that idea. The front aperture is aligned to t
 
 The structural geometry avoids autonomous drift. Rings and spokes do not rotate or translate on a timer. The star field does animate through depth: white and pale-cyan particles move slowly from the far vanishing point toward the viewer, producing outward screen motion and a restrained flight sensation. The app also derives a smoothed eye-motion vector so moving particles can stretch subtly in the direction of motion without sharp jumps.
 
-The read lock is handled in `src/main.js`. Eye movement is smoothed with time-based damping. When the eye is near the reveal position and remains still, `readingHold` rises and `src/scene.js` strengthens the existing anamorphic point text instead of drawing a separate text layer. Edge samples from the same point cloud form a thin glowing contour hint around the dots. The lock is intentionally forgiving: once the prompt resolves, `readingGrace` keeps it readable for at least three seconds before movement can fully dissolve it again. As the lock falls, perspective turns the fixed text points back into a dispersed cloud with only small elastic stretch and compression during motion. Compact screens use wider lock thresholds and reduced scatter amplitude to reduce visual strain.
+The read lock is handled in `src/main.js`. Eye movement is smoothed with time-based damping. When the eye is near the reveal position and remains still, `readingHold` rises and `src/scene.js` strengthens the existing anamorphic point text instead of drawing a separate text layer. Edge samples from the same point cloud form a thin glowing contour hint around the dots. The lock is intentionally forgiving: once the prompt resolves, `readingGrace` keeps it readable for at least three seconds even if the viewer moves. After the hold period, `readingSmoke` moves the points and contour into a smoke-like drift before the text disappears. Compact screens use wider lock thresholds and reduced scatter amplitude to reduce visual strain.
 
 This is different from a stereogram. It does not create binocular disparity. It creates motion parallax and off-axis perspective.
 

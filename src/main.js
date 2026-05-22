@@ -38,6 +38,7 @@ let questionIndex = 0;
 let motionStability = 0;
 let readingHold = 0;
 let readingGrace = 0;
+let readingSmoke = 0;
 let revealFlash = 0;
 let readingCaptured = false;
 let motionX = 0;
@@ -199,6 +200,7 @@ function animate() {
     stability: motionStability,
     readingHold,
     readingGrace,
+    readingSmoke,
     revealFlash,
     isCompact: isCompactViewport(),
     eyeMotion: {
@@ -279,6 +281,7 @@ function updateReadingState(dt, activeQuestion) {
   const instantX = clampMotion((eye.x - previousEye.x) / Math.max(dt, 0.001));
   const instantY = clampMotion((eye.y - previousEye.y) / Math.max(dt, 0.001));
   const isCompact = isCompactViewport();
+  const previousGrace = readingGrace;
   const instantStretch = Math.min(0.74, speed * (isCompact ? 0.95 : 1.35));
   const revealEye = activeQuestion?.revealEye ?? DEFAULT_EYE;
   const aligned =
@@ -296,7 +299,8 @@ function updateReadingState(dt, activeQuestion) {
   readingHold = Math.min(1, Math.max(0, readingHold + dt * rate));
 
   if (readingHold > 0.72 && previousHold <= 0.72 && !readingCaptured) {
-    readingGrace = 3;
+    readingGrace = 3.35;
+    readingSmoke = 0;
     revealFlash = 1;
     readingCaptured = true;
     audio.playReveal();
@@ -305,8 +309,11 @@ function updateReadingState(dt, activeQuestion) {
 
   if (readingGrace > 0) {
     readingGrace = Math.max(0, readingGrace - dt);
-    readingHold = Math.max(readingHold, 0.78);
+    readingHold = Math.max(readingHold, 0.88);
+    if (previousGrace > 0 && readingGrace === 0) readingSmoke = 1;
   }
+
+  readingSmoke = Math.max(0, readingSmoke - dt * 0.46);
 
   if (readingHold < 0.18) readingCaptured = false;
 
@@ -335,6 +342,7 @@ function nextQuestion() {
   Object.assign(targetEye, DEFAULT_EYE);
   readingHold = 0;
   readingGrace = 0;
+  readingSmoke = 0;
   revealFlash = 0;
   readingCaptured = false;
   motionStability = 0;
@@ -386,8 +394,22 @@ function hydrateQaMode() {
       Object.assign(eye, activeQuestion.revealEye);
       Object.assign(previousEye, activeQuestion.revealEye);
       readingHold = 1;
-      readingGrace = 3;
+      readingGrace = 3.35;
+      readingSmoke = 0;
       revealFlash = 1;
+      readingCaptured = true;
+    }
+  }
+  if (params.get("qaSmoke") === "1") {
+    const activeQuestion = selectActiveQuestion(scene.questionPlanes, questionIndex);
+    if (activeQuestion) {
+      Object.assign(targetEye, activeQuestion.revealEye);
+      Object.assign(eye, activeQuestion.revealEye);
+      Object.assign(previousEye, activeQuestion.revealEye);
+      readingHold = 0.42;
+      readingGrace = 0;
+      readingSmoke = 0.86;
+      revealFlash = 0;
       readingCaptured = true;
     }
   }
