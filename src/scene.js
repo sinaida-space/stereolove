@@ -274,20 +274,75 @@ function drawVoid(ctx, state) {
   ctx.fillStyle = PALETTE.background;
   ctx.fillRect(0, 0, viewport.width, viewport.height);
 
-  const glow = ctx.createRadialGradient(
+  drawSoftBloom(ctx, state, vanishing, flash);
+  drawSubtleDither(ctx, state);
+}
+
+function drawSoftBloom(ctx, state, vanishing, flash) {
+  const { viewport, dpr } = state;
+  const level = state.performanceLevel ?? 0;
+  const blur = Math.max(28, Math.min(viewport.width, viewport.height) * 0.065);
+  const bloomScale = level >= 3 ? 0.68 : level >= 2 ? 0.82 : 1;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.filter = `blur(${blur}px)`;
+
+  fillBloomEllipse(
+    ctx,
     vanishing.x,
     vanishing.y,
-    viewport.height * 0.02,
-    vanishing.x,
-    vanishing.y,
-    viewport.height * 0.92,
+    viewport.width * 0.22,
+    viewport.height * 0.18,
+    `rgba(94, 242, 255, ${(0.055 + flash * 0.045) * bloomScale})`,
   );
-  glow.addColorStop(0, `rgba(245, 241, 232, ${0.12 + flash * 0.1})`);
-  glow.addColorStop(0.2, `rgba(94, 242, 255, ${0.075 + flash * 0.055})`);
-  glow.addColorStop(0.5, `rgba(198, 248, 255, ${0.035 + flash * 0.035})`);
-  glow.addColorStop(1, "rgba(5, 6, 9, 0)");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, viewport.width, viewport.height);
+  fillBloomEllipse(
+    ctx,
+    viewport.width * 0.36,
+    viewport.height * 0.54,
+    viewport.width * 0.44,
+    viewport.height * 0.34,
+    `rgba(198, 248, 255, ${0.022 * bloomScale})`,
+  );
+  fillBloomEllipse(
+    ctx,
+    viewport.width * 0.52,
+    viewport.height * 0.62,
+    viewport.width * 0.6,
+    viewport.height * 0.32,
+    `rgba(245, 241, 232, ${(0.014 + flash * 0.025) * bloomScale})`,
+  );
+
+  ctx.filter = "none";
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "rgba(5, 6, 9, 0.18)";
+  ctx.fillRect(0, 0, viewport.width, Math.max(1, 2 * dpr));
+  ctx.restore();
+}
+
+function fillBloomEllipse(ctx, x, y, radiusX, radiusY, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(x, y, radiusX, radiusY, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawSubtleDither(ctx, state) {
+  const level = state.performanceLevel ?? 0;
+  if (level >= 3) return;
+
+  const { viewport, dpr } = state;
+  const spacing = Math.max(46 * dpr, Math.min(viewport.width, viewport.height) / 13);
+
+  ctx.save();
+  ctx.globalAlpha = level >= 2 ? 0.018 : 0.026;
+  ctx.fillStyle = "rgba(198, 248, 255, 0.18)";
+  for (let y = 0; y < viewport.height; y += spacing) {
+    for (let x = (Math.floor(y / spacing) % 2) * spacing * 0.5; x < viewport.width; x += spacing) {
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+  ctx.restore();
 }
 
 function drawStarField(ctx, points, state) {
@@ -777,20 +832,15 @@ function drawGlyphOutlineHint(ctx, question, state, alpha, flash) {
 
 function drawAperture(ctx, state) {
   const { viewport } = state;
-  const vanishing = vanishingPoint(state);
-  const gradient = ctx.createRadialGradient(
-    vanishing.x,
-    vanishing.y,
-    viewport.height * 0.12,
-    vanishing.x,
-    vanishing.y,
-    viewport.height * 0.9,
-  );
-  gradient.addColorStop(0, "rgba(5, 6, 9, 0)");
-  gradient.addColorStop(0.64, "rgba(5, 6, 9, 0.04)");
-  gradient.addColorStop(1, "rgba(5, 6, 9, 0.72)");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, viewport.width, viewport.height);
+  const edge = Math.max(20, Math.min(viewport.width, viewport.height) * 0.055);
+
+  ctx.save();
+  ctx.fillStyle = "rgba(5, 6, 9, 0.22)";
+  ctx.fillRect(0, 0, viewport.width, edge);
+  ctx.fillRect(0, viewport.height - edge, viewport.width, edge);
+  ctx.fillRect(0, 0, edge, viewport.height);
+  ctx.fillRect(viewport.width - edge, 0, edge, viewport.height);
+  ctx.restore();
 
   ctx.strokeStyle = "rgba(245, 241, 232, 0.2)";
   ctx.lineWidth = 1;
