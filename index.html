@@ -33,14 +33,20 @@
         </div>
 
         <p class="intro">
-          Stereolove is a perceptual instrument: it turns a flat monitor into an unstable optical
-          volume and asks how much of reality is made by the position of the observer.
+          Stereolove is a perceptual instrument. The screen is not treated as a window, but as a
+          volume that opens when your viewpoint changes.
         </p>
 
         <p class="intro">
-          Move slowly. The questions appear as constellations of light, not as fixed answers. The
-          work is about noticing how attention, intimacy, memory, and viewpoint edit the world.
+          Move slowly. Hidden questions gather from scattered light when you find the right angle.
+          The work asks how attention, memory, and viewpoint edit reality.
         </p>
+
+        <ol class="gesture-copy" aria-label="Interaction guide">
+          <li>Move your head to search for the hidden angle.</li>
+          <li>Raise an open hand near your face to open another question.</li>
+          <li>No camera? Use touch or mouse to explore the same space.</li>
+        </ol>
 
         <p class="mode-question">How should the space respond?</p>
 
@@ -91,8 +97,18 @@
 
       <div class="experience-toolbar" aria-label="Experience controls">
         <button id="nextQuestionButton" type="button">Next question</button>
+        <button id="cameraOffButton" type="button">Camera off</button>
+        <button id="soundToggleButton" type="button" aria-pressed="true">Sound on</button>
         <button id="exitExperienceButton" type="button">Exit</button>
       </div>
+
+      <aside id="calibrationOverlay" class="calibration-overlay" aria-label="Camera calibration">
+        <span class="kicker">calibration</span>
+        <p>Stand still for a moment. Let the portal find your face.</p>
+        <div class="calibration-track" aria-hidden="true">
+          <span id="calibrationMeter"></span>
+        </div>
+      </aside>
 
       <aside class="orientation-notice" aria-label="Landscape recommendation">
         <span class="orientation-icon" aria-hidden="true"></span>

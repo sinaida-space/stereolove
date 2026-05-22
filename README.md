@@ -2,7 +2,7 @@
 
 Stereolove is a head-coupled op-art installation about perception, perspective, and different ways of constructing reality.
 
-The browser estimates the viewer's head position with MediaPipe Face Landmarker and changes the projection so the monitor behaves like an unstable optical volume behind glass. Without a camera, the same effect works with mouse, trackpad, or touch navigation.
+The browser estimates the viewer's head position with MediaPipe Face Landmarker and changes the projection so the monitor behaves like an unstable optical volume behind glass. MediaPipe Hand Landmarker adds one ritual gesture: raising an open hand near the face opens another question. Without a camera, the same perspective effect works with mouse, trackpad, or touch navigation.
 
 The current scene treats the monitor as a portal into a star tube. Rings, perspective spokes, and background stars use a restrained white-to-cyan palette and stay physically organized behind the screen. Small particles drift slowly outward from the vanishing point. One active introspective question is built as a brighter cyan point cloud: the same fixed 3D points read as text from the reveal viewpoint and disperse through parallax as the viewpoint changes.
 
@@ -60,7 +60,7 @@ The site is deployed to GitHub Pages by `.github/workflows/deploy-pages.yml` whe
 
 The public page starts with a short onboarding screen. The viewer chooses one of three modes:
 
-- `Use camera` starts camera tracking, then enters the fullscreen artwork.
+- `Use camera` starts camera tracking, enters fullscreen, and shows a short face-alignment calibration moment before the artwork becomes fully responsive.
 - `Use mouse` enters the artwork with pointer-based perspective.
 - `Use touch` enters the artwork with touch-based perspective.
 
@@ -68,11 +68,11 @@ The header, footer, cookie notice, and controls are hidden while the artwork is 
 
 On mobile portrait screens, the interface recommends rotating the phone to landscape. Landscape gives the head-coupled projection enough horizontal space and makes the text cloud easier to resolve.
 
-Questions do not advance on a timer. The viewer can hold still to let the point field resolve; edge points from the same cloud form a thin glowing contour hint, then the viewer can use `Next question` or the `N` key when ready.
+Questions do not advance on a timer. The viewer can hold still to let the point field resolve; edge points from the same cloud form a thin glowing contour hint, then the viewer can raise an open hand near the face, use `Next question`, or press the `N` key when ready. The app avoids repeating questions until the current shuffled question deck has been exhausted.
 
-When the question resolves, the text remains readable for at least three seconds and a quiet Web Audio chime marks the moment. After the hold period, the points and contour dissolve into a smoke-like drift. Ambient sound is generated in the browser after the viewer chooses an interaction mode; no audio files are loaded.
+When the question resolves, the text remains readable for at least three seconds and a quiet Web Audio chime marks the moment. After the hold period, the points and contour dissolve into a smoke-like drift. A hand gesture triggers a controlled spiral transition with a small crystalline cue. Ambient sound is generated in the browser after the viewer chooses an interaction mode; no audio files are loaded, and the active artwork includes a sound toggle.
 
-Camera mode requires `getUserMedia`, which works on `localhost` or HTTPS. Camera processing runs locally in the browser. The first stable face position is treated as neutral, and `Recenter view` is available in optional tuning.
+Camera mode requires `getUserMedia`, which works on `localhost` or HTTPS. Camera processing runs locally in the browser. The first stable face position is treated as neutral, and `Recenter view` is available in optional tuning. Hand tracking is a secondary gesture layer and never replaces head tracking or pointer fallback.
 
 MediaPipe is loaded only when camera mode starts, so the artwork still runs if camera access is blocked.
 
@@ -83,6 +83,7 @@ src/
   config.js         shared constants
   audio.js          small Web Audio ambience and reveal cues
   face-tracking.js  dynamic MediaPipe loader and face measurement
+  hand-tracking.js  dynamic MediaPipe loader and near-face hand gesture detection
   main.js           app lifecycle and interaction state
   projection.js     pure head-coupled projection math
   questions.js      question prompts rendered as optical constellations
@@ -104,5 +105,6 @@ docs/
 References:
 
 - [MediaPipe Face Landmarker for Web](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker/web_js)
+- [MediaPipe Hand Landmarker for Web](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker/web_js)
 - [Head-coupled perspective](https://en.wikipedia.org/wiki/Head-coupled_perspective)
 - [Google Chrome Experiment: Head-Coupled 3D Transforms](https://experiments.withgoogle.com/chrome/head-coupled-3d-transforms)

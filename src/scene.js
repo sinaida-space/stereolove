@@ -13,12 +13,12 @@ const QUALITY_PRESETS = {
   mobileLow: { frames: 14, spokes: 18, stars: 650, outline: 300, fill: 380, sampleStep: 7 },
 };
 
-export function createScene(screen, random = Math.random, quality = "high") {
+export function createScene(screen, random = Math.random, quality = "high", questionSet = null) {
   const preset = QUALITY_PRESETS[quality] ?? QUALITY_PRESETS.high;
   const frames = createFrames(screen, random, preset);
   const spokes = createSpokes(screen, random, preset);
   const field = createField(screen, random, preset);
-  const questionPlanes = createQuestionPlanes(screen, random, preset);
+  const questionPlanes = createQuestionPlanes(screen, random, preset, questionSet);
 
   return { frames, spokes, field, questionPlanes };
 }
@@ -31,6 +31,7 @@ export function drawScene(ctx, scene, state) {
   drawTunnel(ctx, scene, state);
   drawQuestionConstellation(ctx, activeQuestion, state);
   drawQuestionLock(ctx, activeQuestion, state);
+  drawHandHint(ctx, state);
   drawAperture(ctx, state);
 }
 
@@ -115,8 +116,10 @@ function createField(screen, random, preset = QUALITY_PRESETS.high) {
   });
 }
 
-function createQuestionPlanes(screen, random, preset = QUALITY_PRESETS.high) {
-  const picked = shuffle([...QUESTIONS], random).slice(0, 12);
+function createQuestionPlanes(screen, random, preset = QUALITY_PRESETS.high, questionSet = null) {
+  const picked = questionSet?.length
+    ? [...questionSet]
+    : shuffle([...QUESTIONS], random).slice(0, 12);
   const touchFriendly =
     globalThis.innerWidth <= 820 ||
     globalThis.innerHeight <= 480 ||
@@ -293,14 +296,8 @@ function drawStarField(ctx, points, state) {
 
   for (const point of points) {
     const progress = (point.phase + time * point.speed) % 1;
-    const current = starPosition(point, progress, depth, state.eyeMotion, state.isCompact);
-    const previous = starPosition(
-      point,
-      Math.max(0, progress - point.trail),
-      depth,
-      state.eyeMotion,
-      state.isCompact,
-    );
+    const current = starPosition(point, progress, depth, state);
+    const previous = starPosition(point, Math.max(0, progress - point.trail), depth, state);
     const projected = projectPoint(current, eye, screen, viewport, dpr);
     if (!projected.visible) continue;
 
@@ -334,24 +331,96 @@ function drawStarField(ctx, points, state) {
   ctx.restore();
 }
 
-function starPosition(
-  point,
-  progress,
-  depth,
-  motion = { x: 0, y: 0, stretch: 0 },
-  isCompact = false,
-) {
+function starPosition(point, progress, depth, state) {
+  const motion = state.eyeMotion ?? { x: 0, y: 0, stretch: 0 };
+  const isCompact = state.isCompact;
+  const spin = state.transitionSpin ?? 0;
   const eased = Math.pow(progress, 1.45);
   const motionLength = Math.hypot(motion.x, motion.y);
   const dirX = motionLength > 0.02 ? motion.x / motionLength : 0;
   const dirY = motionLength > 0.02 ? motion.y / motionLength : 0;
   const along = point.x * dirX + point.y * dirY;
   const stretch = motion.stretch * (isCompact ? 0.035 : 0.055) * eased;
+  return spinPoint(
+    {
+      x: point.x * (0.34 + eased * 0.88) + dirX * along * stretch,
+      y: point.y * (0.34 + eased * 0.88) + dirY * along * stretch,
+      z: (-0.5 - (1 - eased) * STAR_DEPTH) * depth,
+    },
+    spin * (0.24 + eased * 0.68),
+  );
+}
+
+function spinPoint(point, amount) {
+  if (!amount) return point;
+  const radius = Math.hypot(point.x, point.y);
+  const angle = amount * (0.32 + radius * 0.7);
+  const rotated = rotate2(point.x, point.y, angle);
   return {
-    x: point.x * (0.34 + eased * 0.88) + dirX * along * stretch,
-    y: point.y * (0.34 + eased * 0.88) + dirY * along * stretch,
-    z: (-0.5 - (1 - eased) * STAR_DEPTH) * depth,
+    x: rotated.x * (1 + amount * 0.025),
+    y: rotated.y * (1 - amount * 0.018),
+    z: point.z - amount * 0.16,
   };
+}
+
+function warpPoint(point, state) {
+  const spin = state.transitionSpin ?? 0;
+  if (!spin) return point;
+  const depthSignal = clamp(Math.abs(point.z) / Math.abs(TUNNEL_DEPTH), 0, 1);
+  return spinPoint(point, spin * (0.28 + depthSignal * 0.88));
+}
+
+function drawHandHint(ctx, state) {
+  const hint = state.handHint ?? 0;
+  if (hint <= 0.01) return;
+
+  const { viewport, dpr, time } = state;
+  const x = viewport.width * (state.isCompact ? 0.78 : 0.83);
+  const y = viewport.height * (state.isCompact ? 0.5 : 0.56);
+  const scale = Math.min(viewport.width, viewport.height) * (state.isCompact ? 0.07 : 0.055);
+  const pulse = 0.78 + Math.sin(time * 1.8) * 0.22;
+  const alpha = hint * pulse;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.translate(x, y);
+  ctx.rotate(-0.18 + Math.sin(time * 0.72) * 0.035);
+  ctx.strokeStyle = `rgba(${PALETTE.cyan}, ${0.22 * alpha})`;
+  ctx.fillStyle = `rgba(${PALETTE.cyan}, ${0.055 * alpha})`;
+  ctx.lineWidth = Math.max(0.7, dpr * 0.9);
+
+  ctx.beginPath();
+  ctx.ellipse(0, scale * 0.32, scale * 0.34, scale * 0.45, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  for (let i = -2; i <= 2; i += 1) {
+    const fingerX = i * scale * 0.16;
+    const length = scale * (i === 0 ? 0.76 : 0.62 - Math.abs(i) * 0.035);
+    ctx.beginPath();
+    ctx.moveTo(fingerX * 0.62, 0);
+    ctx.quadraticCurveTo(fingerX, -length * 0.42, fingerX * 0.82, -length);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(fingerX * 0.82, -length, Math.max(1.1, dpr * 1.25), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function textPointWithTransition(point, state) {
+  const spin = state.transitionSpin ?? 0;
+  if (!spin) return point;
+  const amount = spin * (0.72 + Math.abs(point.z) * 0.025);
+  return spinPoint(
+    {
+      x: point.x,
+      y: point.y,
+      z: point.z - spin * 0.42,
+    },
+    amount,
+  );
 }
 
 function drawTunnel(ctx, scene, state) {
@@ -534,27 +603,30 @@ function anamorphicQuestionPoint(dot, state, time) {
   const smokeDrift = smoke > 0 ? smokeAge * smokeAge : 0;
   const smokeWave = Math.sin(time * 1.6 + dot.orbit * 1.7) * smokeDrift;
 
-  return {
-    x:
-      dot.x * compression +
-      scatterX +
-      Math.cos(dot.orbit) * breathing +
-      dot.scatterX * smokeDrift * 0.18 +
-      smokeWave * 0.04,
-    y:
-      dot.y * compression +
-      scatterY +
-      Math.sin(dot.orbit) * breathing +
-      dot.scatterY * smokeDrift * 0.1 +
-      smokeDrift * 0.18,
-    z:
-      (dot.z +
-        dot.scatterZ * stretchAmount -
-        stretchAmount * dot.elastic * 0.24 +
-        dot.scatterZ * smokeDrift * 1.15 -
-        smokeDrift * dot.elastic * 0.9) *
-      state.depth,
-  };
+  return textPointWithTransition(
+    {
+      x:
+        dot.x * compression +
+        scatterX +
+        Math.cos(dot.orbit) * breathing +
+        dot.scatterX * smokeDrift * 0.18 +
+        smokeWave * 0.04,
+      y:
+        dot.y * compression +
+        scatterY +
+        Math.sin(dot.orbit) * breathing +
+        dot.scatterY * smokeDrift * 0.1 +
+        smokeDrift * 0.18,
+      z:
+        (dot.z +
+          dot.scatterZ * stretchAmount -
+          stretchAmount * dot.elastic * 0.24 +
+          dot.scatterZ * smokeDrift * 1.15 -
+          smokeDrift * dot.elastic * 0.9) *
+        state.depth,
+    },
+    state,
+  );
 }
 
 function drawQuestionLock(ctx, question, state) {
@@ -700,8 +772,8 @@ function drawAperture(ctx, state) {
 
 function drawWorldLine(ctx, a, b, state, color, alpha, lineWidth = 1) {
   const { eye, screen, viewport, dpr } = state;
-  const pa = projectPoint(a, eye, screen, viewport, dpr);
-  const pb = projectPoint(b, eye, screen, viewport, dpr);
+  const pa = projectPoint(warpPoint(a, state), eye, screen, viewport, dpr);
+  const pb = projectPoint(warpPoint(b, state), eye, screen, viewport, dpr);
   if (!pa.visible && !pb.visible) return;
 
   const scale = clamp((pa.scale + pb.scale) * 0.5, 0.05, 1.25);
