@@ -1,7 +1,7 @@
 import { DEFAULT_EYE } from "./config.js";
 import { createAudioController } from "./audio.js";
 import { createFaceTracker, extractFaceMeasurement } from "./face-tracking.js";
-import { createScene, drawScene } from "./scene.js";
+import { createScene, drawScene, selectActiveQuestion } from "./scene.js";
 import { deriveFaceEye, derivePointerEye, lerp, makeScreen } from "./projection.js";
 
 const canvas = document.querySelector("#stage");
@@ -185,7 +185,7 @@ function animate() {
   eye.y = lerp(eye.y, targetEye.y, follow);
   eye.z = lerp(eye.z, targetEye.z, follow);
 
-  updateReadingState(dt);
+  updateReadingState(dt, selectActiveQuestion(scene.questionPlanes, questionIndex));
   revealFlash = Math.max(0, revealFlash - dt * 0.82);
 
   drawScene(ctx, scene, {
@@ -200,7 +200,7 @@ function animate() {
     readingHold,
     readingGrace,
     revealFlash,
-    isCompact: window.innerWidth <= 820,
+    isCompact: isCompactViewport(),
     eyeMotion: {
       x: motionX,
       y: motionY,
@@ -269,7 +269,7 @@ function updatePointerEye(event) {
   Object.assign(targetEye, derivePointerEye(pointer, Number(sensitivitySlider.value)));
 }
 
-function updateReadingState(dt) {
+function updateReadingState(dt, activeQuestion) {
   const distance = Math.hypot(
     eye.x - previousEye.x,
     eye.y - previousEye.y,
@@ -278,18 +278,21 @@ function updateReadingState(dt) {
   const speed = distance / Math.max(dt, 0.001);
   const instantX = clampMotion((eye.x - previousEye.x) / Math.max(dt, 0.001));
   const instantY = clampMotion((eye.y - previousEye.y) / Math.max(dt, 0.001));
-  const isCompact = window.innerWidth <= 820;
+  const isCompact = isCompactViewport();
   const instantStretch = Math.min(0.74, speed * (isCompact ? 0.95 : 1.35));
-  const aligned = 1 - Math.min(1, Math.hypot(eye.x * 0.58, eye.y * 0.82));
-  const stableTarget = speed < (isCompact ? 0.2 : 0.16) ? 1 : 0;
+  const revealEye = activeQuestion?.revealEye ?? DEFAULT_EYE;
+  const aligned =
+    1 - Math.min(1, Math.hypot((eye.x - revealEye.x) * 0.58, (eye.y - revealEye.y) * 0.82));
+  const stableTarget = speed < (isCompact ? 0.24 : 0.16) ? 1 : 0;
   const previousHold = readingHold;
 
   motionX = lerp(motionX, instantX, 1 - Math.exp(-dt * 4.2));
   motionY = lerp(motionY, instantY, 1 - Math.exp(-dt * 4.2));
   motionStretch = lerp(motionStretch, instantStretch, 1 - Math.exp(-dt * 3.4));
   motionStability = lerp(motionStability, stableTarget, 1 - Math.exp(-dt * 3.4));
-  const lockTarget = aligned > (isCompact ? 0.36 : 0.42) && motionStability > 0.42 ? 1 : 0;
-  const rate = lockTarget ? (isCompact ? 1.08 : 0.86) : readingGrace > 0 ? -0.08 : -0.55;
+  const lockTarget =
+    aligned > (isCompact ? 0.25 : 0.38) && motionStability > (isCompact ? 0.34 : 0.42) ? 1 : 0;
+  const rate = lockTarget ? (isCompact ? 1.28 : 0.94) : readingGrace > 0 ? -0.08 : -0.55;
   readingHold = Math.min(1, Math.max(0, readingHold + dt * rate));
 
   if (readingHold > 0.72 && previousHold <= 0.72 && !readingCaptured) {
@@ -314,6 +317,14 @@ function updateReadingState(dt) {
 
 function clampMotion(value) {
   return Math.min(1.15, Math.max(-1.15, value));
+}
+
+function isCompactViewport() {
+  return (
+    window.innerWidth <= 820 ||
+    window.innerHeight <= 480 ||
+    window.matchMedia?.("(pointer: coarse)").matches === true
+  );
 }
 
 function nextQuestion() {
@@ -368,6 +379,18 @@ function hydrateQaMode() {
   pointer.x = 0;
   pointer.y = 0;
   Object.assign(targetEye, DEFAULT_EYE);
+  if (params.get("qaLock") === "1") {
+    const activeQuestion = selectActiveQuestion(scene.questionPlanes, questionIndex);
+    if (activeQuestion) {
+      Object.assign(targetEye, activeQuestion.revealEye);
+      Object.assign(eye, activeQuestion.revealEye);
+      Object.assign(previousEye, activeQuestion.revealEye);
+      readingHold = 1;
+      readingGrace = 3;
+      revealFlash = 1;
+      readingCaptured = true;
+    }
+  }
   document.body.classList.add("experience-active");
   document.querySelector("#instructions").hidden = true;
   document.querySelector(".site-header").hidden = true;
