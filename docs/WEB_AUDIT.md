@@ -23,6 +23,7 @@ https://sinaida-space.github.io/stereolove/
 - Resolved questions remain readable for at least three seconds, dissolve into a smoke-like drift, and trigger a small generated audio cue after the viewer has enabled an interaction mode.
 - Camera mode now includes a short face-alignment calibration moment, a hand gesture for changing questions, and a ghost hand hint after extended inactivity.
 - The active artwork includes `Next question`, `Camera off`, `Sound on/off`, and `Exit` controls as accessibility fallbacks.
+- The renderer now uses adaptive frame-rate and LOD profiles, reduces canvas passes under load, skips rendering in hidden tabs, and throttles face and hand detection independently.
 - Mobile portrait screens show a landscape recommendation so the text cloud has enough room to resolve comfortably.
 - The active artwork includes a keyboard shortcut so questions change intentionally instead of disappearing before they can be read.
 - Camera mode is opt-in and starts only after a user gesture.

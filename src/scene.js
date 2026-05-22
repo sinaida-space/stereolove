@@ -7,10 +7,12 @@ const STAR_DEPTH = 17.8;
 const BACKGROUND_COLORS = ["245, 241, 232", "198, 248, 255", "94, 242, 255"];
 const TEXT_COLORS = ["64, 232, 255", "94, 242, 255", "142, 252, 255", "204, 255, 255"];
 const QUALITY_PRESETS = {
-  high: { frames: 34, spokes: 42, stars: 2300, outline: 620, fill: 900, sampleStep: 5 },
-  balanced: { frames: 24, spokes: 34, stars: 1700, outline: 520, fill: 720, sampleStep: 5 },
-  mobile: { frames: 18, spokes: 24, stars: 950, outline: 360, fill: 520, sampleStep: 6 },
-  mobileLow: { frames: 14, spokes: 18, stars: 650, outline: 300, fill: 380, sampleStep: 7 },
+  high: { frames: 32, spokes: 34, stars: 1700, outline: 520, fill: 760, sampleStep: 5 },
+  balanced: { frames: 22, spokes: 26, stars: 1100, outline: 420, fill: 600, sampleStep: 6 },
+  mobile: { frames: 16, spokes: 18, stars: 620, outline: 300, fill: 430, sampleStep: 7 },
+  mobileLow: { frames: 12, spokes: 14, stars: 360, outline: 230, fill: 300, sampleStep: 8 },
+  low: { frames: 16, spokes: 18, stars: 620, outline: 320, fill: 420, sampleStep: 7 },
+  panic: { frames: 10, spokes: 10, stars: 220, outline: 190, fill: 220, sampleStep: 9 },
 };
 
 export function createScene(screen, random = Math.random, quality = "high", questionSet = null) {
@@ -290,14 +292,21 @@ function drawVoid(ctx, state) {
 
 function drawStarField(ctx, points, state) {
   const { depth, eye, screen, viewport, dpr, time } = state;
+  const level = state.performanceLevel ?? 0;
+  const stride = level >= 3 ? 4 : level >= 2 ? 3 : level >= 1 ? 2 : 1;
+  const trails = level <= 1;
+  const halos = level === 0;
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
 
-  for (const point of points) {
+  for (let i = 0; i < points.length; i += stride) {
+    const point = points[i];
     const progress = (point.phase + time * point.speed) % 1;
     const current = starPosition(point, progress, depth, state);
-    const previous = starPosition(point, Math.max(0, progress - point.trail), depth, state);
+    const previous = trails
+      ? starPosition(point, Math.max(0, progress - point.trail), depth, state)
+      : null;
     const projected = projectPoint(current, eye, screen, viewport, dpr);
     if (!projected.visible) continue;
 
@@ -305,8 +314,8 @@ function drawStarField(ctx, points, state) {
     const alpha = clamp(0.08 + near * 0.62 + projected.depth * 0.16, 0.06, 0.72);
     const radius = clamp(point.size * projected.scale * (0.7 + near * 1.15), 0.42, 4.5);
 
-    const trail = projectPoint(previous, eye, screen, viewport, dpr);
-    if (trail.visible && near > 0.08) {
+    const trail = trails ? projectPoint(previous, eye, screen, viewport, dpr) : null;
+    if (trail?.visible && near > 0.08) {
       ctx.strokeStyle = `rgba(${point.color}, ${alpha * 0.12})`;
       ctx.lineWidth = clamp(radius * 0.42, 0.25, 1.6);
       ctx.beginPath();
@@ -315,7 +324,7 @@ function drawStarField(ctx, points, state) {
       ctx.stroke();
     }
 
-    if (point.halo) {
+    if (halos && point.halo) {
       ctx.fillStyle = `rgba(${point.color}, ${alpha * (0.04 + near * 0.05)})`;
       ctx.beginPath();
       ctx.arc(projected.x, projected.y, radius * point.halo * dpr, 0, Math.PI * 2);
@@ -425,13 +434,16 @@ function textPointWithTransition(point, state) {
 
 function drawTunnel(ctx, scene, state) {
   const { frames, spokes } = scene;
+  const level = state.performanceLevel ?? 0;
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
 
-  drawSpokes(ctx, spokes, state, 2.9, 0.04);
-  drawFrames(ctx, frames, state, 2.8, 0.04);
-  drawSpokes(ctx, spokes, state, 0.76, 0.15);
+  if (level <= 1) {
+    drawSpokes(ctx, spokes, state, 2.4, 0.035);
+    drawFrames(ctx, frames, state, 2.2, 0.035);
+  }
+  if (level <= 2) drawSpokes(ctx, spokes, state, 0.66, 0.13);
   drawFrames(ctx, frames, state, 0.58, 0.46);
 
   ctx.restore();
@@ -533,19 +545,25 @@ function drawQuestionConstellation(ctx, question, state) {
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
 
-  const passes = state.isCompact
-    ? [
-        { alpha: 0.16, scale: 2.15 },
-        { alpha: 0.76, scale: 0.9 },
-      ]
-    : [
-        { alpha: 0.07, scale: 3.4 },
-        { alpha: 0.18, scale: 1.65 },
-        { alpha: 0.72, scale: 0.82 },
-      ];
+  const level = state.performanceLevel ?? 0;
+  const passes =
+    level >= 2
+      ? [{ alpha: 0.78, scale: level >= 3 ? 0.78 : 0.9 }]
+      : state.isCompact
+        ? [
+            { alpha: 0.16, scale: 2.15 },
+            { alpha: 0.76, scale: 0.9 },
+          ]
+        : [
+            { alpha: 0.07, scale: 3.4 },
+            { alpha: 0.18, scale: 1.65 },
+            { alpha: 0.72, scale: 0.82 },
+          ];
+  const stride = level >= 3 ? 3 : level >= 2 ? 2 : 1;
 
   for (const pass of passes) {
-    for (const dot of question.points) {
+    for (let i = 0; i < question.points.length; i += stride) {
+      const dot = question.points[i];
       const color = TEXT_COLORS[dot.colorShift % TEXT_COLORS.length];
       const world = anamorphicQuestionPoint(dot, state, time);
       const projected = projectPoint(world, eye, screen, viewport, dpr);
@@ -648,12 +666,16 @@ function drawQuestionLock(ctx, question, state) {
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
 
+  const level = state.performanceLevel ?? 0;
   for (const pass of [
     { radius: 3.4, alpha: 0.08 + flash * 0.04 },
     { radius: 1, alpha: 0.52 + flash * 0.12 },
   ]) {
+    if (level >= 2 && pass.radius > 1.2) continue;
     if (state.isCompact && pass.radius > 1.2) continue;
-    for (const dot of question.outlinePoints) {
+    const stride = level >= 3 ? 3 : level >= 2 ? 2 : 1;
+    for (let i = 0; i < question.outlinePoints.length; i += stride) {
+      const dot = question.outlinePoints[i];
       const world = anamorphicQuestionPoint(dot, state, time);
       const projected = projectPoint(world, eye, screen, viewport, dpr);
       if (!projected.visible) continue;
@@ -671,7 +693,8 @@ function drawQuestionLock(ctx, question, state) {
     }
   }
 
-  for (const dot of question.outlinePoints.slice(0, state.isCompact ? 140 : 260)) {
+  const sparkleLimit = level >= 2 ? 80 : state.isCompact ? 140 : 220;
+  for (const dot of question.outlinePoints.slice(0, sparkleLimit)) {
     const world = anamorphicQuestionPoint(dot, state, time);
     const projected = projectPoint(world, eye, screen, viewport, dpr);
     if (!projected.visible) continue;
@@ -696,6 +719,7 @@ function drawQuestionLock(ctx, question, state) {
 function drawGlyphOutlineHint(ctx, question, state, alpha, flash) {
   const { viewport, dpr, screen, eye, depth, time } = state;
   const smoke = state.readingSmoke ?? 0;
+  const level = state.performanceLevel ?? 0;
   const smokeAge = 1 - smoke;
   const anchor = projectPoint(
     { x: question.x, y: question.y, z: -0.18 * depth },
@@ -734,9 +758,12 @@ function drawGlyphOutlineHint(ctx, question, state, alpha, flash) {
 
     ctx.lineWidth = Math.max(0.54, 1.46 * dpr);
     ctx.strokeStyle = `rgba(${PALETTE.cyan}, ${(0.34 + flash * 0.12) * outlineAlpha})`;
-    ctx.shadowColor = `rgba(${PALETTE.cyan}, ${(1 + flash * 0.28) * outlineAlpha})`;
-    ctx.shadowBlur = (20 + flash * 18 + smoke * 22) * dpr;
+    ctx.shadowColor =
+      level <= 1 ? `rgba(${PALETTE.cyan}, ${(1 + flash * 0.28) * outlineAlpha})` : "transparent";
+    ctx.shadowBlur = level <= 1 ? (14 + flash * 10 + smoke * 12) * dpr : 0;
     ctx.strokeText(text, 0, y, maxWidth);
+
+    if (level >= 2) return;
 
     ctx.lineWidth = Math.max(0.3, 0.56 * dpr);
     ctx.strokeStyle = `rgba(245, 241, 232, ${(0.48 + flash * 0.14) * outlineAlpha})`;
