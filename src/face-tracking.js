@@ -23,7 +23,7 @@ export async function createFaceTracker() {
     baseOptions: {
       modelAssetPath:
         "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
-      delegate: "GPU",
+      delegate: "CPU",
     },
     runningMode: "VIDEO",
     numFaces: 1,

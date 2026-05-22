@@ -24,13 +24,15 @@ The structural geometry avoids autonomous drift. Rings and spokes do not rotate 
 
 The read lock is handled in `src/main.js`. Eye movement is smoothed with time-based damping. When the eye is near the reveal position and remains still, `readingHold` rises and `src/scene.js` strengthens the existing anamorphic point text instead of drawing a separate text layer. Edge samples from the same point cloud form a thin glowing contour hint around the dots. The lock is intentionally forgiving: once the prompt resolves, `readingGrace` keeps it readable for at least three seconds even if the viewer moves. After the hold period, `readingSmoke` moves the points and contour into a smoke-like drift before the text disappears. Compact screens use wider lock thresholds and reduced scatter amplitude to reduce visual strain.
 
+Performance is adaptive rather than fixed. `src/main.js` measures render cost and moves through high, balanced, low, and panic profiles when a device cannot keep up. Those profiles cap frame rate, lower DPR, rebuild the scene with smaller particle sets, and pass `performanceLevel` into `src/scene.js`. The renderer then draws fewer star particles, fewer question dots, fewer tunnel passes, and disables expensive shadow-blur text work in low modes. Hidden tabs skip drawing and MediaPipe work entirely.
+
 Question order is managed as a shuffled session deck in `src/main.js`. The renderer keeps only a small batch of question point clouds in memory for performance, then builds the next batch when the current one is exhausted. This avoids repeats through the deck without sampling all prompts at startup.
 
 This is different from a stereogram. It does not create binocular disparity. It creates motion parallax and off-axis perspective.
 
 ## Camera Dependency
 
-The first render does not depend on MediaPipe. Face tracking is loaded when the user presses `Use camera`; hand tracking loads after the camera stream starts so the main camera experience is not blocked by the larger hand model. Both trackers run on throttled intervals because MediaPipe video detection is synchronous. If hand tracking fails, head tracking and pointer fallback still work.
+The first render does not depend on MediaPipe. Face tracking is loaded when the user presses `Use camera`; hand tracking loads after the camera stream starts so the main camera experience is not blocked by the larger hand model. Both trackers run on throttled intervals because MediaPipe video detection is synchronous, and face and hand inference are not run in the same animation frame. The trackers use the CPU delegate to avoid competing with canvas compositing on weak GPUs. If hand tracking fails, head tracking and pointer fallback still work.
 
 ## Browser Requirements
 

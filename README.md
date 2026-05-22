@@ -76,6 +76,8 @@ Camera mode requires `getUserMedia`, which works on `localhost` or HTTPS. Camera
 
 MediaPipe is loaded only when camera mode starts, so the artwork still runs if camera access is blocked.
 
+The renderer adapts to device load. It measures frame cost, lowers frame rate and DPR when needed, reduces particle and text-dot detail, cuts extra glow passes, and pauses work when the tab is hidden. Camera and hand detection are throttled and never run in the same animation frame.
+
 ## Project Structure
 
 ```text

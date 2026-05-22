@@ -27,6 +27,12 @@ const sensitivitySlider = document.querySelector("#sensitivitySlider");
 const xReadout = document.querySelector("#xReadout");
 const yReadout = document.querySelector("#yReadout");
 const zReadout = document.querySelector("#zReadout");
+const FRAME_PROFILES = [
+  { name: "high", desktopFps: 48, compactFps: 30, faceMs: 120, handMs: 260 },
+  { name: "balanced", desktopFps: 38, compactFps: 24, faceMs: 170, handMs: 360 },
+  { name: "low", desktopFps: 28, compactFps: 18, faceMs: 240, handMs: 520 },
+  { name: "panic", desktopFps: 20, compactFps: 14, faceMs: 340, handMs: 760 },
+];
 
 let dpr = 1;
 let viewport = { width: 1, height: 1 };
@@ -44,6 +50,9 @@ let previousFrameTime = startTime;
 let nextFaceDetectAt = 0;
 let nextHandDetectAt = 0;
 let nextReadoutAt = 0;
+let performanceLevel = 0;
+let renderCostAverage = 0;
+let coolFrames = 0;
 let questionDeck = [];
 let questionDeckCursor = 0;
 let currentQuestionBatch = [];
@@ -76,7 +85,7 @@ const audio = createAudioController();
 resize();
 resetQuestionDeck();
 currentQuestionBatch = takeQuestionBatch();
-scene = createScene(screen, Math.random, getRenderQuality(), currentQuestionBatch);
+scene = createScene(screen, Math.random, getSceneQuality(), currentQuestionBatch);
 hydrateCookieBanner();
 hydrateQaMode();
 syncSoundButton();
@@ -154,7 +163,11 @@ window.addEventListener("pointerleave", () => {
 
 window.addEventListener("resize", () => {
   resize();
-  scene = createScene(screen, Math.random, getRenderQuality(), currentQuestionBatch);
+  scene = createScene(screen, Math.random, getSceneQuality(), currentQuestionBatch);
+});
+
+document.addEventListener("visibilitychange", () => {
+  previousFrameTime = performance.now();
 });
 
 async function startCamera({ enterOnReady = false } = {}) {
@@ -162,8 +175,14 @@ async function startCamera({ enterOnReady = false } = {}) {
 
   try {
     faceTracker = await createFaceTracker();
+    const compact = isCompactViewport();
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } },
+      video: {
+        facingMode: "user",
+        width: { ideal: compact ? 480 : 640 },
+        height: { ideal: compact ? 270 : 360 },
+        frameRate: { ideal: compact ? 18 : 24, max: compact ? 24 : 30 },
+      },
       audio: false,
     });
 
@@ -210,16 +229,22 @@ function stopCamera() {
 function animate() {
   requestAnimationFrame(animate);
   const now = performance.now();
-  const frameInterval = isCompactViewport() ? 1000 / 34 : 1000 / 52;
+  if (document.hidden) {
+    previousFrameTime = now;
+    return;
+  }
+
+  const frameInterval = getFrameInterval();
   if (now - previousFrameTime < frameInterval) return;
 
+  const renderStart = performance.now();
   const time = (now - startTime) * 0.001;
   const dt = Math.min((now - previousFrameTime) * 0.001, 0.07);
   previousFrameTime = now;
 
   if (cameraMode) {
-    detectFace(now);
-    detectHand(now);
+    const faceDetectedThisFrame = detectFace(now);
+    if (!faceDetectedThisFrame) detectHand(now);
   }
 
   const follow = 1 - Math.exp(-dt * 2.25);
@@ -248,7 +273,8 @@ function animate() {
     transitionSpin: gestureTransition,
     handHint,
     isCompact: isCompactViewport(),
-    quality: getRenderQuality(),
+    performanceLevel,
+    quality: getSceneQuality(),
     eyeMotion: {
       x: motionX,
       y: motionY,
@@ -259,15 +285,16 @@ function animate() {
     updateReadout();
     nextReadoutAt = now + 180;
   }
+  updatePerformanceBudget(performance.now() - renderStart, frameInterval);
 }
 
 function detectFace(now) {
-  const detectInterval = isCompactViewport() ? 115 : 75;
-  if (now < nextFaceDetectAt) return;
+  const detectInterval = getCurrentProfile().faceMs;
+  if (now < nextFaceDetectAt) return false;
   nextFaceDetectAt = now + detectInterval;
 
-  if (!faceTracker || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
-  if (video.currentTime === lastVideoTime) return;
+  if (!faceTracker || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
+  if (video.currentTime === lastVideoTime) return false;
 
   lastVideoTime = video.currentTime;
   const measurement = extractFaceMeasurement(faceTracker.detectForVideo(video, now));
@@ -279,7 +306,7 @@ function detectFace(now) {
     } else {
       setStatus("Looking for face", "idle");
     }
-    return;
+    return true;
   }
 
   lastFace = measurement;
@@ -297,6 +324,7 @@ function detectFace(now) {
   );
   if (!calibrationActive)
     setStatus(handTracker ? "Tracking face and hand" : "Tracking face", "live");
+  return true;
 }
 
 async function loadHandTracker() {
@@ -309,7 +337,7 @@ async function loadHandTracker() {
 }
 
 function detectHand(now) {
-  const detectInterval = isCompactViewport() ? 190 : 145;
+  const detectInterval = getCurrentProfile().handMs;
   if (!handTracker || !lastFace || now < nextHandDetectAt) return;
   nextHandDetectAt = now + detectInterval;
 
@@ -325,7 +353,7 @@ function detectHand(now) {
 }
 
 function resize() {
-  dpr = Math.min(window.devicePixelRatio || 1, isCompactViewport() ? 1 : 1.35);
+  dpr = Math.min(window.devicePixelRatio || 1, getMaxDpr());
   viewport = {
     width: Math.floor(window.innerWidth * dpr),
     height: Math.floor(window.innerHeight * dpr),
@@ -337,11 +365,60 @@ function resize() {
   screen = makeScreen(window.innerWidth, window.innerHeight);
 }
 
-function getRenderQuality() {
+function getCurrentProfile() {
+  return FRAME_PROFILES[performanceLevel] ?? FRAME_PROFILES.at(-1);
+}
+
+function getMaxDpr() {
+  if (isCompactViewport()) return performanceLevel >= 2 ? 0.82 : 1;
+  if (performanceLevel >= 3) return 0.85;
+  if (performanceLevel >= 2) return 1;
+  return 1.25;
+}
+
+function getFrameInterval() {
+  const profile = getCurrentProfile();
+  return 1000 / (isCompactViewport() ? profile.compactFps : profile.desktopFps);
+}
+
+function getSceneQuality() {
   const compact = isCompactViewport();
   const cores = navigator.hardwareConcurrency || 4;
+  if (performanceLevel >= 3) return "panic";
+  if (performanceLevel >= 2) return compact ? "mobileLow" : "low";
   if (compact) return cores <= 4 ? "mobileLow" : "mobile";
-  return cores <= 4 ? "balanced" : "high";
+  if (performanceLevel >= 1 || cores <= 4) return "balanced";
+  return "high";
+}
+
+function updatePerformanceBudget(renderCost, frameInterval) {
+  renderCostAverage = renderCostAverage ? renderCostAverage * 0.92 + renderCost * 0.08 : renderCost;
+  const overload = renderCostAverage > frameInterval * 0.78 || renderCost > frameInterval * 1.15;
+
+  if (overload && performanceLevel < FRAME_PROFILES.length - 1) {
+    setPerformanceLevel(performanceLevel + 1);
+    coolFrames = 0;
+    return;
+  }
+
+  if (renderCostAverage < frameInterval * 0.36 && performanceLevel > 0) {
+    coolFrames += 1;
+    if (coolFrames > 240) {
+      setPerformanceLevel(performanceLevel - 1);
+      coolFrames = 0;
+    }
+  } else {
+    coolFrames = 0;
+  }
+}
+
+function setPerformanceLevel(nextLevel) {
+  const level = Math.min(FRAME_PROFILES.length - 1, Math.max(0, nextLevel));
+  if (level === performanceLevel) return;
+  performanceLevel = level;
+  resize();
+  scene = createScene(screen, Math.random, getSceneQuality(), currentQuestionBatch);
+  questionIndex = Math.min(questionIndex, scene.questionPlanes.length - 1);
 }
 
 function setStatus(text, state) {
@@ -487,7 +564,7 @@ function advanceQuestion({ playSound = true, recenter = true } = {}) {
 
   if (questionIndex >= scene.questionPlanes.length - 1) {
     currentQuestionBatch = takeQuestionBatch();
-    scene = createScene(screen, Math.random, getRenderQuality(), currentQuestionBatch);
+    scene = createScene(screen, Math.random, getSceneQuality(), currentQuestionBatch);
     questionIndex = 0;
   } else {
     questionIndex += 1;
