@@ -7,12 +7,12 @@ const STAR_DEPTH = 17.8;
 const BACKGROUND_COLORS = ["245, 241, 232", "198, 248, 255", "94, 242, 255"];
 const TEXT_COLORS = ["64, 232, 255", "94, 242, 255", "142, 252, 255", "204, 255, 255"];
 const QUALITY_PRESETS = {
-  high: { frames: 32, spokes: 34, stars: 1700, outline: 520, fill: 760, sampleStep: 5 },
-  balanced: { frames: 22, spokes: 26, stars: 1100, outline: 420, fill: 600, sampleStep: 6 },
-  mobile: { frames: 16, spokes: 18, stars: 620, outline: 300, fill: 430, sampleStep: 7 },
-  mobileLow: { frames: 12, spokes: 14, stars: 360, outline: 230, fill: 300, sampleStep: 8 },
-  low: { frames: 16, spokes: 18, stars: 620, outline: 320, fill: 420, sampleStep: 7 },
-  panic: { frames: 10, spokes: 10, stars: 220, outline: 190, fill: 220, sampleStep: 9 },
+  high: { frames: 32, spokes: 34, stars: 4200, outline: 520, fill: 760, sampleStep: 5 },
+  balanced: { frames: 22, spokes: 26, stars: 2700, outline: 420, fill: 600, sampleStep: 6 },
+  mobile: { frames: 16, spokes: 18, stars: 1500, outline: 300, fill: 430, sampleStep: 7 },
+  mobileLow: { frames: 12, spokes: 14, stars: 1300, outline: 230, fill: 300, sampleStep: 8 },
+  low: { frames: 16, spokes: 18, stars: 2200, outline: 320, fill: 420, sampleStep: 7 },
+  panic: { frames: 10, spokes: 10, stars: 1400, outline: 190, fill: 220, sampleStep: 9 },
 };
 
 export function createScene(screen, random = Math.random, quality = "high", questionSet = null) {
@@ -106,9 +106,9 @@ function createField(screen, random, preset = QUALITY_PRESETS.high) {
       z,
       size: core ? 0.42 + random() * 0.78 : 0.52 + random() * 1.55,
       bloom: core ? 0.8 + random() * 1.4 : random() < 0.22 ? 0.35 + random() * 0.9 : 0,
-      speed: core ? 0.008 + random() * 0.01 : 0.012 + random() * 0.018,
+      speed: core ? 0.048 + random() * 0.046 : 0.065 + random() * 0.075,
       phase: random(),
-      trail: 0.012 + random() * 0.024,
+      trail: 0.04 + random() * 0.07,
       color:
         BACKGROUND_COLORS[
           (i + Math.floor(random() * BACKGROUND_COLORS.length)) % BACKGROUND_COLORS.length
@@ -322,7 +322,7 @@ function drawGalaxyMist(ctx, state, vanishing, flash) {
 function drawStarField(ctx, points, state) {
   const { depth, eye, screen, viewport, dpr, time } = state;
   const level = state.performanceLevel ?? 0;
-  const stride = level >= 3 ? 4 : level >= 2 ? 3 : level >= 1 ? 2 : 1;
+  const stride = level >= 2 ? 2 : 1;
   const trails = level <= 1;
 
   ctx.save();
@@ -339,13 +339,13 @@ function drawStarField(ctx, points, state) {
     if (!projected.visible) continue;
 
     const near = smoothstep(0.18, 0.96, progress);
-    const alpha = clamp(0.08 + near * 0.62 + projected.depth * 0.16, 0.06, 0.72);
-    const radius = clamp(point.size * projected.scale * (0.7 + near * 1.15), 0.42, 4.5);
+    const alpha = clamp(0.12 + near * 0.78 + projected.depth * 0.2, 0.08, 0.9);
+    const radius = clamp(point.size * projected.scale * (0.72 + near * 1.25), 0.42, 4.8);
 
     const trail = trails ? projectPoint(previous, eye, screen, viewport, dpr) : null;
     if (trail?.visible && near > 0.08) {
-      ctx.strokeStyle = `rgba(${point.color}, ${alpha * 0.1})`;
-      ctx.lineWidth = clamp(radius * 0.42, 0.25, 1.6);
+      ctx.strokeStyle = `rgba(${point.color}, ${alpha * 0.24})`;
+      ctx.lineWidth = clamp(radius * 0.5, 0.3, 2);
       ctx.beginPath();
       ctx.moveTo(trail.x, trail.y);
       ctx.lineTo(projected.x, projected.y);
