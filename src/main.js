@@ -513,11 +513,8 @@ function updateGestureState(dt, now) {
 function updateCalibrationState(dt) {
   if (!calibrationActive) return;
 
-  const stable = lastFace && Math.hypot(targetEye.x, targetEye.y) < 0.36;
-  calibrationProgress = Math.min(
-    1,
-    Math.max(0, calibrationProgress + dt * (stable ? 0.72 : -0.42)),
-  );
+  const stable = lastFace && Math.hypot(targetEye.x, targetEye.y) < 0.48;
+  calibrationProgress = Math.min(1, Math.max(0, calibrationProgress + dt * (stable ? 2.6 : -0.52)));
   if (calibrationMeter) calibrationMeter.style.transform = `scaleX(${calibrationProgress})`;
 
   if (calibrationProgress >= 1) {
