@@ -14,12 +14,6 @@ const QUALITY_PRESETS = {
   low: { frames: 16, spokes: 18, stars: 620, outline: 320, fill: 420, sampleStep: 7 },
   panic: { frames: 10, spokes: 10, stars: 220, outline: 190, fill: 220, sampleStep: 9 },
 };
-const MIST_LANES = [
-  { x: -0.34, y: -0.08, bend: -0.18, alpha: 0.09, width: 0.16, color: "94, 242, 255" },
-  { x: -0.2, y: 0.18, bend: 0.12, alpha: 0.07, width: 0.12, color: "198, 248, 255" },
-  { x: 0.24, y: -0.14, bend: 0.2, alpha: 0.08, width: 0.14, color: "245, 241, 232" },
-  { x: 0.36, y: 0.16, bend: -0.16, alpha: 0.06, width: 0.1, color: "94, 242, 255" },
-];
 
 export function createScene(screen, random = Math.random, quality = "high", questionSet = null) {
   const preset = QUALITY_PRESETS[quality] ?? QUALITY_PRESETS.high;
@@ -39,7 +33,6 @@ export function drawScene(ctx, scene, state) {
   drawTunnel(ctx, scene, state);
   drawQuestionConstellation(ctx, activeQuestion, state);
   drawQuestionLock(ctx, activeQuestion, state);
-  drawHandHint(ctx, state);
   drawAperture(ctx, state);
 }
 
@@ -112,7 +105,6 @@ function createField(screen, random, preset = QUALITY_PRESETS.high) {
       y: Math.sin(angle) * radiusY + (random() - 0.5) * screen.height * 0.05,
       z,
       size: core ? 0.42 + random() * 0.78 : 0.52 + random() * 1.55,
-      halo: random() < (core ? 0.28 : 0.09) ? 1.2 + random() * 2.1 : 0,
       bloom: core ? 0.8 + random() * 1.4 : random() < 0.22 ? 0.35 + random() * 0.9 : 0,
       speed: core ? 0.008 + random() * 0.01 : 0.012 + random() * 0.018,
       phase: random(),
@@ -304,7 +296,7 @@ function drawDeepSpaceGradient(ctx, state) {
 }
 
 function drawGalaxyMist(ctx, state, vanishing, flash) {
-  const { viewport, dpr } = state;
+  const { viewport } = state;
   const level = state.performanceLevel ?? 0;
   if (level >= 3) return;
 
@@ -325,38 +317,6 @@ function drawGalaxyMist(ctx, state, vanishing, flash) {
   core.addColorStop(1, "rgba(5, 6, 9, 0)");
   ctx.fillStyle = core;
   ctx.fillRect(0, 0, viewport.width, viewport.height);
-
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  ctx.lineCap = "round";
-  const mistScale = level >= 2 ? 0.55 : level >= 1 ? 0.74 : 1;
-  const driftX = clamp(state.eye.x, -0.8, 0.8) * size * 0.035;
-  const driftY = clamp(state.eye.y, -0.55, 0.55) * size * 0.03;
-
-  for (const lane of MIST_LANES) {
-    const startX = vanishing.x + lane.x * viewport.width * 0.8 + driftX;
-    const startY = vanishing.y + lane.y * viewport.height * 0.52 + driftY;
-    const endX = vanishing.x - lane.x * viewport.width * 0.46 + driftX * 0.3;
-    const endY = vanishing.y - lane.y * viewport.height * 0.34 + driftY * 0.4;
-    const bendX = vanishing.x + lane.bend * viewport.width;
-    const bendY = vanishing.y + lane.y * viewport.height * 0.08;
-
-    ctx.filter = `blur(${Math.max(10, size * lane.width * 0.16)}px)`;
-    ctx.strokeStyle = `rgba(${lane.color}, ${lane.alpha * mistScale})`;
-    ctx.lineWidth = Math.max(4, size * lane.width * 0.11) * dpr;
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.quadraticCurveTo(bendX, bendY, endX, endY);
-    ctx.stroke();
-
-    ctx.filter = `blur(${Math.max(3, size * lane.width * 0.04)}px)`;
-    ctx.strokeStyle = `rgba(${lane.color}, ${lane.alpha * 0.34 * mistScale})`;
-    ctx.lineWidth = Math.max(0.8, size * lane.width * 0.018) * dpr;
-    ctx.stroke();
-  }
-
-  ctx.filter = "none";
-  ctx.restore();
 }
 
 function drawStarField(ctx, points, state) {
@@ -455,45 +415,6 @@ function warpPoint(point, state) {
   if (!spin) return point;
   const depthSignal = clamp(Math.abs(point.z) / Math.abs(TUNNEL_DEPTH), 0, 1);
   return spinPoint(point, spin * (0.28 + depthSignal * 0.88));
-}
-
-function drawHandHint(ctx, state) {
-  const hint = state.handHint ?? 0;
-  if (hint <= 0.01) return;
-
-  const { viewport, dpr, time } = state;
-  const x = viewport.width * (state.isCompact ? 0.78 : 0.83);
-  const y = viewport.height * (state.isCompact ? 0.5 : 0.56);
-  const scale = Math.min(viewport.width, viewport.height) * (state.isCompact ? 0.07 : 0.055);
-  const pulse = 0.78 + Math.sin(time * 1.8) * 0.22;
-  const alpha = hint * pulse;
-
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  ctx.translate(x, y);
-  ctx.rotate(-0.18 + Math.sin(time * 0.72) * 0.035);
-  ctx.strokeStyle = `rgba(${PALETTE.cyan}, ${0.22 * alpha})`;
-  ctx.fillStyle = `rgba(${PALETTE.cyan}, ${0.055 * alpha})`;
-  ctx.lineWidth = Math.max(0.7, dpr * 0.9);
-
-  ctx.beginPath();
-  ctx.ellipse(0, scale * 0.32, scale * 0.34, scale * 0.45, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  for (let i = -2; i <= 2; i += 1) {
-    const fingerX = i * scale * 0.16;
-    const length = scale * (i === 0 ? 0.76 : 0.62 - Math.abs(i) * 0.035);
-    ctx.beginPath();
-    ctx.moveTo(fingerX * 0.62, 0);
-    ctx.quadraticCurveTo(fingerX, -length * 0.42, fingerX * 0.82, -length);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(fingerX * 0.82, -length, Math.max(1.1, dpr * 1.25), 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.restore();
 }
 
 function textPointWithTransition(point, state) {
