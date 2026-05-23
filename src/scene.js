@@ -14,6 +14,12 @@ const QUALITY_PRESETS = {
   low: { frames: 16, spokes: 18, stars: 620, outline: 320, fill: 420, sampleStep: 7 },
   panic: { frames: 10, spokes: 10, stars: 220, outline: 190, fill: 220, sampleStep: 9 },
 };
+const MIST_LANES = [
+  { x: -0.34, y: -0.08, bend: -0.18, alpha: 0.09, width: 0.16, color: "94, 242, 255" },
+  { x: -0.2, y: 0.18, bend: 0.12, alpha: 0.07, width: 0.12, color: "198, 248, 255" },
+  { x: 0.24, y: -0.14, bend: 0.2, alpha: 0.08, width: 0.14, color: "245, 241, 232" },
+  { x: 0.36, y: 0.16, bend: -0.16, alpha: 0.06, width: 0.1, color: "94, 242, 255" },
+];
 
 export function createScene(screen, random = Math.random, quality = "high", questionSet = null) {
   const preset = QUALITY_PRESETS[quality] ?? QUALITY_PRESETS.high;
@@ -106,7 +112,8 @@ function createField(screen, random, preset = QUALITY_PRESETS.high) {
       y: Math.sin(angle) * radiusY + (random() - 0.5) * screen.height * 0.05,
       z,
       size: core ? 0.42 + random() * 0.78 : 0.52 + random() * 1.55,
-      halo: random() < 0.18 ? 1.5 + random() * 3.1 : 0,
+      halo: random() < (core ? 0.28 : 0.09) ? 1.2 + random() * 2.1 : 0,
+      bloom: core ? 0.8 + random() * 1.4 : random() < 0.22 ? 0.35 + random() * 0.9 : 0,
       speed: core ? 0.008 + random() * 0.01 : 0.012 + random() * 0.018,
       phase: random(),
       trail: 0.012 + random() * 0.024,
@@ -274,20 +281,82 @@ function drawVoid(ctx, state) {
   ctx.fillStyle = PALETTE.background;
   ctx.fillRect(0, 0, viewport.width, viewport.height);
 
-  const glow = ctx.createRadialGradient(
-    vanishing.x,
-    vanishing.y,
-    viewport.height * 0.02,
-    vanishing.x,
-    vanishing.y,
-    viewport.height * 0.92,
-  );
-  glow.addColorStop(0, `rgba(245, 241, 232, ${0.12 + flash * 0.1})`);
-  glow.addColorStop(0.2, `rgba(94, 242, 255, ${0.075 + flash * 0.055})`);
-  glow.addColorStop(0.5, `rgba(198, 248, 255, ${0.035 + flash * 0.035})`);
-  glow.addColorStop(1, "rgba(5, 6, 9, 0)");
-  ctx.fillStyle = glow;
+  drawDeepSpaceGradient(ctx, state);
+  drawGalaxyMist(ctx, state, vanishing, flash);
+}
+
+function drawDeepSpaceGradient(ctx, state) {
+  const { viewport } = state;
+  const vertical = ctx.createLinearGradient(0, 0, 0, viewport.height);
+  vertical.addColorStop(0, "rgba(1, 3, 6, 0.92)");
+  vertical.addColorStop(0.34, "rgba(4, 9, 13, 0.22)");
+  vertical.addColorStop(0.66, "rgba(3, 8, 12, 0.18)");
+  vertical.addColorStop(1, "rgba(0, 2, 5, 0.88)");
+  ctx.fillStyle = vertical;
   ctx.fillRect(0, 0, viewport.width, viewport.height);
+
+  const horizontal = ctx.createLinearGradient(0, 0, viewport.width, 0);
+  horizontal.addColorStop(0, "rgba(0, 0, 0, 0.34)");
+  horizontal.addColorStop(0.5, "rgba(5, 16, 20, 0)");
+  horizontal.addColorStop(1, "rgba(0, 0, 0, 0.4)");
+  ctx.fillStyle = horizontal;
+  ctx.fillRect(0, 0, viewport.width, viewport.height);
+}
+
+function drawGalaxyMist(ctx, state, vanishing, flash) {
+  const { viewport, dpr } = state;
+  const level = state.performanceLevel ?? 0;
+  if (level >= 3) return;
+
+  const size = Math.min(viewport.width, viewport.height);
+  const outerRadius = size * (state.isCompact ? 0.78 : 0.64);
+  const core = ctx.createRadialGradient(
+    vanishing.x,
+    vanishing.y,
+    0,
+    vanishing.x,
+    vanishing.y,
+    outerRadius,
+  );
+  core.addColorStop(0, `rgba(245, 241, 232, ${0.12 + flash * 0.08})`);
+  core.addColorStop(0.16, `rgba(198, 248, 255, ${0.062 + flash * 0.04})`);
+  core.addColorStop(0.42, `rgba(94, 242, 255, ${0.026 + flash * 0.02})`);
+  core.addColorStop(0.74, "rgba(24, 72, 82, 0.012)");
+  core.addColorStop(1, "rgba(5, 6, 9, 0)");
+  ctx.fillStyle = core;
+  ctx.fillRect(0, 0, viewport.width, viewport.height);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  const mistScale = level >= 2 ? 0.55 : level >= 1 ? 0.74 : 1;
+  const driftX = clamp(state.eye.x, -0.8, 0.8) * size * 0.035;
+  const driftY = clamp(state.eye.y, -0.55, 0.55) * size * 0.03;
+
+  for (const lane of MIST_LANES) {
+    const startX = vanishing.x + lane.x * viewport.width * 0.8 + driftX;
+    const startY = vanishing.y + lane.y * viewport.height * 0.52 + driftY;
+    const endX = vanishing.x - lane.x * viewport.width * 0.46 + driftX * 0.3;
+    const endY = vanishing.y - lane.y * viewport.height * 0.34 + driftY * 0.4;
+    const bendX = vanishing.x + lane.bend * viewport.width;
+    const bendY = vanishing.y + lane.y * viewport.height * 0.08;
+
+    ctx.filter = `blur(${Math.max(10, size * lane.width * 0.16)}px)`;
+    ctx.strokeStyle = `rgba(${lane.color}, ${lane.alpha * mistScale})`;
+    ctx.lineWidth = Math.max(4, size * lane.width * 0.11) * dpr;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.quadraticCurveTo(bendX, bendY, endX, endY);
+    ctx.stroke();
+
+    ctx.filter = `blur(${Math.max(3, size * lane.width * 0.04)}px)`;
+    ctx.strokeStyle = `rgba(${lane.color}, ${lane.alpha * 0.34 * mistScale})`;
+    ctx.lineWidth = Math.max(0.8, size * lane.width * 0.018) * dpr;
+    ctx.stroke();
+  }
+
+  ctx.filter = "none";
+  ctx.restore();
 }
 
 function drawStarField(ctx, points, state) {
@@ -295,7 +364,6 @@ function drawStarField(ctx, points, state) {
   const level = state.performanceLevel ?? 0;
   const stride = level >= 3 ? 4 : level >= 2 ? 3 : level >= 1 ? 2 : 1;
   const trails = level <= 1;
-  const halos = level === 0;
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
@@ -316,7 +384,7 @@ function drawStarField(ctx, points, state) {
 
     const trail = trails ? projectPoint(previous, eye, screen, viewport, dpr) : null;
     if (trail?.visible && near > 0.08) {
-      ctx.strokeStyle = `rgba(${point.color}, ${alpha * 0.12})`;
+      ctx.strokeStyle = `rgba(${point.color}, ${alpha * 0.1})`;
       ctx.lineWidth = clamp(radius * 0.42, 0.25, 1.6);
       ctx.beginPath();
       ctx.moveTo(trail.x, trail.y);
@@ -324,20 +392,30 @@ function drawStarField(ctx, points, state) {
       ctx.stroke();
     }
 
-    if (halos && point.halo) {
-      ctx.fillStyle = `rgba(${point.color}, ${alpha * (0.04 + near * 0.05)})`;
-      ctx.beginPath();
-      ctx.arc(projected.x, projected.y, radius * point.halo * dpr, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.fillStyle = `rgba(${point.color}, ${alpha})`;
-    ctx.beginPath();
-    ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
-    ctx.fill();
+    drawStarDot(ctx, point, projected, radius, alpha, near, level, dpr);
   }
 
   ctx.restore();
+}
+
+function drawStarDot(ctx, point, projected, radius, alpha, near, level, dpr) {
+  const bloom = point.bloom ?? 0;
+  const canGlow = level <= 1 && bloom > 0.2;
+
+  if (canGlow) {
+    ctx.shadowColor = `rgba(${point.color}, ${0.22 + near * 0.22})`;
+    ctx.shadowBlur = clamp(radius * (4 + bloom * 3.8) * dpr, 2.5, 18);
+  }
+
+  ctx.fillStyle = `rgba(${point.color}, ${alpha})`;
+  ctx.beginPath();
+  ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (canGlow) {
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = "transparent";
+  }
 }
 
 function starPosition(point, progress, depth, state) {
@@ -777,24 +855,40 @@ function drawGlyphOutlineHint(ctx, question, state, alpha, flash) {
 
 function drawAperture(ctx, state) {
   const { viewport } = state;
-  const vanishing = vanishingPoint(state);
-  const gradient = ctx.createRadialGradient(
-    vanishing.x,
-    vanishing.y,
-    viewport.height * 0.12,
-    vanishing.x,
-    vanishing.y,
-    viewport.height * 0.9,
-  );
-  gradient.addColorStop(0, "rgba(5, 6, 9, 0)");
-  gradient.addColorStop(0.64, "rgba(5, 6, 9, 0.04)");
-  gradient.addColorStop(1, "rgba(5, 6, 9, 0.72)");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, viewport.width, viewport.height);
+  drawEdgeVignette(ctx, viewport);
 
   ctx.strokeStyle = "rgba(245, 241, 232, 0.2)";
   ctx.lineWidth = 1;
   ctx.strokeRect(7, 7, viewport.width - 14, viewport.height - 14);
+}
+
+function drawEdgeVignette(ctx, viewport) {
+  const edgeX = Math.max(120, viewport.width * 0.18);
+  const edgeY = Math.max(90, viewport.height * 0.2);
+
+  const left = ctx.createLinearGradient(0, 0, edgeX, 0);
+  left.addColorStop(0, "rgba(0, 0, 0, 0.72)");
+  left.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = left;
+  ctx.fillRect(0, 0, edgeX, viewport.height);
+
+  const right = ctx.createLinearGradient(viewport.width, 0, viewport.width - edgeX, 0);
+  right.addColorStop(0, "rgba(0, 0, 0, 0.74)");
+  right.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = right;
+  ctx.fillRect(viewport.width - edgeX, 0, edgeX, viewport.height);
+
+  const top = ctx.createLinearGradient(0, 0, 0, edgeY);
+  top.addColorStop(0, "rgba(0, 0, 0, 0.56)");
+  top.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = top;
+  ctx.fillRect(0, 0, viewport.width, edgeY);
+
+  const bottom = ctx.createLinearGradient(0, viewport.height, 0, viewport.height - edgeY);
+  bottom.addColorStop(0, "rgba(0, 0, 0, 0.62)");
+  bottom.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = bottom;
+  ctx.fillRect(0, viewport.height - edgeY, viewport.width, edgeY);
 }
 
 function drawWorldLine(ctx, a, b, state, color, alpha, lineWidth = 1) {
@@ -810,12 +904,20 @@ function drawWorldLine(ctx, a, b, state, color, alpha, lineWidth = 1) {
     1,
   );
   const headLight = clamp(1 + Math.hypot(state.eye.x, state.eye.y) * 0.08, 1, 1.18);
-  ctx.strokeStyle = `rgba(${color}, ${clamp(alpha * (0.72 + edgeLight * 0.65) * headLight, 0, 0.86)})`;
-  ctx.lineWidth = clamp(lineWidth * dpr * (0.42 + scale * 0.92 + edgeLight * 0.22), 0.12, 3.2);
+  const lineAlpha = clamp(alpha * (0.72 + edgeLight * 0.65) * headLight, 0, 0.86);
+  const width = clamp(lineWidth * dpr * (0.42 + scale * 0.92 + edgeLight * 0.22), 0.12, 3.2);
+  if ((state.performanceLevel ?? 0) <= 1 && lineAlpha > 0.04) {
+    ctx.shadowColor = `rgba(${color}, ${lineAlpha * 0.42})`;
+    ctx.shadowBlur = clamp(width * (2.6 + edgeLight * 2.4), 0.8, 8);
+  }
+  ctx.strokeStyle = `rgba(${color}, ${lineAlpha})`;
+  ctx.lineWidth = width;
   ctx.beginPath();
   ctx.moveTo(pa.x, pa.y);
   ctx.lineTo(pb.x, pb.y);
   ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = "transparent";
 }
 
 function distanceFromCenter(point, viewport) {
