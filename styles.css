@@ -11,6 +11,14 @@
   --panel-solid: rgba(10, 12, 15, 0.9);
 }
 
+@font-face {
+  font-family: "Bitmgothic";
+  src: url("./assets/fonts/Bitmgothic.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -170,6 +178,19 @@ h1 {
   letter-spacing: 0;
 }
 
+.brand-title {
+  font-family: "Bitmgothic", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(32px, 6vw, 48px);
+  font-weight: 400;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-shadow:
+    0 0 18px rgba(94, 242, 255, 0.18),
+    0 0 38px rgba(245, 241, 232, 0.1);
+}
+
 .mode-question {
   margin: 18px 0 0;
   color: var(--ink);
@@ -324,6 +345,35 @@ body.camera-on #webcam {
   min-height: 36px;
   padding: 0 12px;
   background: rgba(5, 6, 9, 0.72);
+}
+
+.gesture-overlay {
+  position: fixed;
+  z-index: 8;
+  left: 50%;
+  top: 50%;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px;
+  color: rgba(198, 248, 255, 0.92);
+  font-family: "Bitmgothic", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(28px, 5.8vw, 72px);
+  line-height: 0.95;
+  letter-spacing: 0;
+  text-align: center;
+  text-shadow:
+    0 0 14px rgba(94, 242, 255, 0.42),
+    0 0 42px rgba(94, 242, 255, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.94);
+  transition:
+    opacity 160ms ease,
+    transform 240ms ease;
+}
+
+.gesture-overlay.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
 }
 
 .calibration-overlay {
