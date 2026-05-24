@@ -159,7 +159,7 @@ input {
 
 .title {
   display: grid;
-  gap: 4px;
+  gap: 8px;
 }
 
 .kicker {
@@ -182,9 +182,11 @@ h1 {
   font-family: "Bitmgothic", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
   max-width: 100%;
   overflow: hidden;
-  font-size: clamp(32px, 6vw, 48px);
+  margin: 8px 0 14px;
+  font-size: clamp(38px, 6.8vw, 62px);
   font-weight: 400;
-  text-transform: uppercase;
+  line-height: 1.12;
+  letter-spacing: 0.045em;
   color: var(--ink);
   text-shadow:
     0 0 18px rgba(94, 242, 255, 0.18),
@@ -256,6 +258,11 @@ button:hover {
 
 button:active {
   transform: translateY(1px);
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
 .tuning-controls {
@@ -358,7 +365,7 @@ body.camera-on #webcam {
   font-family: "Bitmgothic", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
   font-size: clamp(28px, 5.8vw, 72px);
   line-height: 0.95;
-  letter-spacing: 0;
+  letter-spacing: 0.055em;
   text-align: center;
   text-shadow:
     0 0 14px rgba(94, 242, 255, 0.42),
@@ -366,14 +373,28 @@ body.camera-on #webcam {
   opacity: 0;
   pointer-events: none;
   transform: translate(-50%, -50%) scale(0.94);
-  transition:
-    opacity 160ms ease,
-    transform 240ms ease;
 }
 
 .gesture-overlay.visible {
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
+  animation: gesture-overlay-hold 2s ease forwards;
+}
+
+@keyframes gesture-overlay-hold {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+
+  12%,
+  82% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.98);
+  }
 }
 
 .calibration-overlay {
@@ -645,6 +666,12 @@ body.experience-active.fullscreen-unavailable .experience-toolbar {
 
   h1 {
     font-size: 42px;
+  }
+
+  .brand-title {
+    margin: 10px 0 16px;
+    font-size: clamp(31px, 7vw, 38px);
+    letter-spacing: 0.02em;
   }
 
   .actions {

@@ -7,12 +7,12 @@ const STAR_DEPTH = 17.8;
 const BACKGROUND_COLORS = ["245, 241, 232", "198, 248, 255", "94, 242, 255"];
 const TEXT_COLORS = ["64, 232, 255", "94, 242, 255", "142, 252, 255", "204, 255, 255"];
 const QUALITY_PRESETS = {
-  high: { frames: 32, spokes: 34, stars: 4200, outline: 520, fill: 760, sampleStep: 5 },
-  balanced: { frames: 22, spokes: 26, stars: 2700, outline: 420, fill: 600, sampleStep: 6 },
-  mobile: { frames: 16, spokes: 18, stars: 1500, outline: 300, fill: 430, sampleStep: 7 },
-  mobileLow: { frames: 12, spokes: 14, stars: 1300, outline: 230, fill: 300, sampleStep: 8 },
-  low: { frames: 16, spokes: 18, stars: 2200, outline: 320, fill: 420, sampleStep: 7 },
-  panic: { frames: 10, spokes: 10, stars: 1400, outline: 190, fill: 220, sampleStep: 9 },
+  high: { frames: 32, spokes: 24, stars: 2400, outline: 480, fill: 680, sampleStep: 5 },
+  balanced: { frames: 18, spokes: 18, stars: 1500, outline: 360, fill: 520, sampleStep: 6 },
+  mobile: { frames: 12, spokes: 12, stars: 850, outline: 240, fill: 340, sampleStep: 7 },
+  mobileLow: { frames: 9, spokes: 8, stars: 560, outline: 180, fill: 260, sampleStep: 8 },
+  low: { frames: 12, spokes: 12, stars: 850, outline: 250, fill: 320, sampleStep: 7 },
+  panic: { frames: 8, spokes: 6, stars: 360, outline: 130, fill: 180, sampleStep: 9 },
 };
 
 export function createScene(screen, random = Math.random, quality = "high", questionSet = null) {
@@ -99,6 +99,7 @@ function createField(screen, random, preset = QUALITY_PRESETS.high) {
     const core = random() < 0.18;
     const radiusX = screen.width * (core ? 0.08 + random() * 0.28 : 0.2 + shell * 0.38);
     const radiusY = screen.height * (core ? 0.08 + random() * 0.26 : 0.2 + shell * 0.38);
+    const comet = random() < (core ? 0.016 : 0.036);
 
     return {
       x: Math.cos(angle) * radiusX + (random() - 0.5) * screen.width * 0.05,
@@ -108,7 +109,8 @@ function createField(screen, random, preset = QUALITY_PRESETS.high) {
       bloom: core ? 0.8 + random() * 1.4 : random() < 0.22 ? 0.35 + random() * 0.9 : 0,
       speed: core ? 0.036 + random() * 0.0345 : 0.04875 + random() * 0.05625,
       phase: random(),
-      trail: 0.04 + random() * 0.07,
+      trail: comet ? 0.14 + random() * 0.16 : 0.04 + random() * 0.07,
+      comet,
       color:
         BACKGROUND_COLORS[
           (i + Math.floor(random() * BACKGROUND_COLORS.length)) % BACKGROUND_COLORS.length
@@ -332,7 +334,8 @@ function drawStarField(ctx, points, state) {
     const point = points[i];
     const progress = (point.phase + time * point.speed) % 1;
     const current = starPosition(point, progress, depth, state);
-    const previous = trails
+    const shouldDrawTrail = trails && (point.comet || i % (state.isCompact ? 4 : 2) === 0);
+    const previous = shouldDrawTrail
       ? starPosition(point, Math.max(0, progress - point.trail), depth, state)
       : null;
     const projected = projectPoint(current, eye, screen, viewport, dpr);
@@ -342,19 +345,47 @@ function drawStarField(ctx, points, state) {
     const alpha = clamp(0.12 + near * 0.78 + projected.depth * 0.2, 0.08, 0.9);
     const radius = clamp(point.size * projected.scale * (0.72 + near * 1.25), 0.42, 4.8);
 
-    const trail = trails ? projectPoint(previous, eye, screen, viewport, dpr) : null;
+    const trail = shouldDrawTrail ? projectPoint(previous, eye, screen, viewport, dpr) : null;
     if (trail?.visible && near > 0.08) {
-      ctx.strokeStyle = `rgba(${point.color}, ${alpha * 0.24})`;
-      ctx.lineWidth = clamp(radius * 0.5, 0.3, 2);
-      ctx.beginPath();
-      ctx.moveTo(trail.x, trail.y);
-      ctx.lineTo(projected.x, projected.y);
-      ctx.stroke();
+      if (point.comet && level <= 1 && near > 0.18) {
+        drawCometTail(ctx, point, trail, projected, radius, alpha, near, dpr);
+      } else {
+        ctx.strokeStyle = `rgba(${point.color}, ${alpha * 0.18})`;
+        ctx.lineWidth = clamp(radius * 0.42, 0.24, 1.6);
+        ctx.beginPath();
+        ctx.moveTo(trail.x, trail.y);
+        ctx.lineTo(projected.x, projected.y);
+        ctx.stroke();
+      }
     }
 
     drawStarDot(ctx, point, projected, radius, alpha, near, level, dpr);
   }
 
+  ctx.restore();
+}
+
+function drawCometTail(ctx, point, trail, projected, radius, alpha, near, dpr) {
+  const gradient = ctx.createLinearGradient(trail.x, trail.y, projected.x, projected.y);
+  gradient.addColorStop(0, `rgba(${point.color}, 0)`);
+  gradient.addColorStop(0.52, `rgba(${point.color}, ${alpha * 0.055})`);
+  gradient.addColorStop(1, `rgba(${point.color}, ${alpha * (0.22 + near * 0.08)})`);
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.strokeStyle = gradient;
+  ctx.lineWidth = clamp(radius * (2.2 + near * 2.4), 1.2 * dpr, 8 * dpr);
+  ctx.beginPath();
+  ctx.moveTo(trail.x, trail.y);
+  ctx.lineTo(projected.x, projected.y);
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(${point.color}, ${alpha * 0.18})`;
+  ctx.lineWidth = clamp(radius * 0.74, 0.45 * dpr, 2.4 * dpr);
+  ctx.beginPath();
+  ctx.moveTo(trail.x, trail.y);
+  ctx.lineTo(projected.x, projected.y);
+  ctx.stroke();
   ctx.restore();
 }
 

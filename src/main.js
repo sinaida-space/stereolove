@@ -34,6 +34,7 @@ const FRAME_PROFILES = [
   { name: "low", desktopFps: 36, compactFps: 26, faceMs: 240, handMs: 520 },
   { name: "panic", desktopFps: 28, compactFps: 20, faceMs: 340, handMs: 760 },
 ];
+const READINESS_FRAMES = 8;
 
 let dpr = 1;
 let viewport = { width: 1, height: 1 };
@@ -51,8 +52,11 @@ let previousFrameTime = startTime;
 let nextFaceDetectAt = 0;
 let nextHandDetectAt = 0;
 let nextReadoutAt = 0;
-let performanceLevel = 0;
+let performanceLevel = getInitialPerformanceLevel();
 let renderCostAverage = 0;
+let readinessCostAverage = 0;
+let readinessFrames = 0;
+let deviceReady = false;
 let coolFrames = 0;
 let questionDeck = [];
 let questionDeckCursor = 0;
@@ -66,6 +70,7 @@ let revealFlash = 0;
 let readingCaptured = false;
 let gestureCooldown = 0;
 let gestureTransition = 0;
+let gestureOverlayTimer = 0;
 let pendingGestureQuestion = false;
 let calibrationActive = false;
 let calibrationProgress = 0;
@@ -90,6 +95,13 @@ scene = createScene(screen, Math.random, getSceneQuality(), currentQuestionBatch
 hydrateCookieBanner();
 hydrateQaMode();
 syncSoundButton();
+if (!document.body.classList.contains("experience-active")) {
+  setInteractionReady(false);
+  setStatus("Checking device capacity", "idle");
+}
+setTimeout(() => {
+  if (!deviceReady) markDeviceReady();
+}, 2400);
 animate();
 
 cameraButton.addEventListener("click", () => {
@@ -248,7 +260,7 @@ function animate() {
     if (!faceDetectedThisFrame) detectHand(now);
   }
 
-  const follow = 1 - Math.exp(-dt * 2.75);
+  const follow = 1 - Math.exp(-dt * 1.95);
   eye.x = lerp(eye.x, targetEye.x, follow);
   eye.y = lerp(eye.y, targetEye.y, follow);
   eye.z = lerp(eye.z, targetEye.z, follow);
@@ -286,7 +298,9 @@ function animate() {
     updateReadout();
     nextReadoutAt = now + 180;
   }
-  updatePerformanceBudget(performance.now() - renderStart, frameInterval);
+  const renderCost = performance.now() - renderStart;
+  updatePerformanceBudget(renderCost, frameInterval);
+  updateReadiness(renderCost, frameInterval);
 }
 
 function detectFace(now) {
@@ -392,6 +406,20 @@ function getSceneQuality() {
   return "high";
 }
 
+function getInitialPerformanceLevel() {
+  const compact =
+    window.innerWidth <= 820 ||
+    window.innerHeight <= 480 ||
+    window.matchMedia?.("(pointer: coarse)").matches === true;
+  const cores = navigator.hardwareConcurrency || 4;
+  const memory = navigator.deviceMemory || 4;
+  const saveData = navigator.connection?.saveData === true;
+
+  if (saveData || memory <= 2 || cores <= 2) return 3;
+  if (compact || memory <= 4 || cores <= 4) return 2;
+  return 1;
+}
+
 function updatePerformanceBudget(renderCost, frameInterval) {
   renderCostAverage = renderCostAverage ? renderCostAverage * 0.92 + renderCost * 0.08 : renderCost;
   const overload = renderCostAverage > frameInterval * 0.94 || renderCost > frameInterval * 1.45;
@@ -410,6 +438,41 @@ function updatePerformanceBudget(renderCost, frameInterval) {
     }
   } else {
     coolFrames = 0;
+  }
+}
+
+function updateReadiness(renderCost, frameInterval) {
+  if (deviceReady || document.body.classList.contains("experience-active")) return;
+
+  readinessCostAverage = readinessCostAverage
+    ? readinessCostAverage * 0.72 + renderCost * 0.28
+    : renderCost;
+  readinessFrames += 1;
+
+  if (readinessFrames >= 3 && readinessCostAverage > frameInterval * 0.72) {
+    if (performanceLevel < FRAME_PROFILES.length - 1) {
+      setPerformanceLevel(performanceLevel + 1);
+      readinessCostAverage = 0;
+      readinessFrames = 0;
+      setStatus("Reducing visual load", "idle");
+      return;
+    }
+    markDeviceReady("Light mode ready");
+    return;
+  }
+
+  if (readinessFrames >= READINESS_FRAMES) markDeviceReady();
+}
+
+function markDeviceReady(message = performanceLevel >= 2 ? "Light mode ready" : "Ready") {
+  deviceReady = true;
+  setInteractionReady(true);
+  if (!document.body.classList.contains("experience-active")) setStatus(message, "live");
+}
+
+function setInteractionReady(ready) {
+  for (const button of [cameraButton, pointerButton, touchButton]) {
+    button.disabled = !ready;
   }
 }
 
@@ -460,8 +523,8 @@ function updateReadingState(dt, activeQuestion) {
 
   motionX = lerp(motionX, instantX, 1 - Math.exp(-dt * 4.2));
   motionY = lerp(motionY, instantY, 1 - Math.exp(-dt * 4.2));
-  motionStretch = lerp(motionStretch, instantStretch, 1 - Math.exp(-dt * 3.4));
-  motionStability = lerp(motionStability, stableTarget, 1 - Math.exp(-dt * 3.4));
+  motionStretch = lerp(motionStretch, instantStretch, 1 - Math.exp(-dt * 2.35));
+  motionStability = lerp(motionStability, stableTarget, 1 - Math.exp(-dt * 2.6));
   const lockTarget =
     aligned > (isCompact ? 0.25 : 0.38) && motionStability > (isCompact ? 0.34 : 0.42) ? 1 : 0;
   const rate = lockTarget ? (isCompact ? 1.28 : 0.94) : readingGrace > 0 ? -0.08 : -0.55;
@@ -494,7 +557,8 @@ function updateReadingState(dt, activeQuestion) {
 function updateGestureState(dt, now) {
   gestureCooldown = Math.max(0, gestureCooldown - dt);
   gestureTransition = Math.max(0, gestureTransition - dt * 1.45);
-  if (gestureOverlay) gestureOverlay.classList.toggle("visible", gestureTransition > 0.18);
+  gestureOverlayTimer = Math.max(0, gestureOverlayTimer - dt);
+  if (gestureOverlay) gestureOverlay.classList.toggle("visible", gestureOverlayTimer > 0);
 
   if (pendingGestureQuestion && gestureTransition < 0.58) {
     pendingGestureQuestion = false;
@@ -532,6 +596,7 @@ function updateCalibrationState(dt) {
 function triggerGestureQuestion() {
   gestureCooldown = 3.8;
   gestureTransition = 1;
+  gestureOverlayTimer = 2;
   pendingGestureQuestion = true;
   handHint = 0;
   readingSmoke = 1;
@@ -694,6 +759,7 @@ function hydrateQaMode() {
   if (params.get("qaHandHint") === "1") handHint = 1;
   if (params.get("qaGesture") === "1") {
     gestureTransition = 1;
+    gestureOverlayTimer = 2;
     readingSmoke = 1;
     revealFlash = 1;
   }
