@@ -41,6 +41,23 @@ body,
     sans-serif;
 }
 
+#app {
+  position: relative;
+}
+
+#app::before {
+  position: fixed;
+  z-index: 4;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(5, 6, 9, 0.24), rgba(5, 6, 9, 0.74) 72%),
+    rgba(0, 0, 0, 0.24);
+  opacity: 1;
+  transition: opacity 240ms ease;
+  content: "";
+}
+
 a {
   color: inherit;
 }
@@ -122,16 +139,29 @@ input {
   z-index: 6;
   top: 50%;
   left: 50%;
-  width: min(560px, calc(100vw - 32px));
+  width: min(640px, calc(100vw - 36px));
   max-height: calc(100dvh - 150px);
   overflow: auto;
-  padding: clamp(18px, 3vw, 28px);
-  border: 1px solid var(--line);
+  padding: clamp(26px, 4vw, 42px);
+  border: 1px solid rgba(245, 241, 232, 0.2);
   border-radius: 8px;
-  background: var(--panel);
+  background:
+    linear-gradient(145deg, rgba(245, 241, 232, 0.06), rgba(94, 242, 255, 0.025)),
+    rgba(5, 7, 10, 0.68);
+  backdrop-filter: blur(16px) saturate(1.18);
   color: var(--ink);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+  box-shadow:
+    0 24px 90px rgba(0, 0, 0, 0.68),
+    0 0 76px rgba(94, 242, 255, 0.08),
+    inset 0 1px 0 rgba(245, 241, 232, 0.1),
+    inset 0 0 58px rgba(94, 242, 255, 0.035);
   transform: translate(-50%, -50%);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .panel {
+    background: rgba(5, 7, 10, 0.84);
+  }
 }
 
 .intro {
@@ -159,7 +189,7 @@ input {
 
 .title {
   display: grid;
-  gap: 8px;
+  gap: 12px;
 }
 
 .kicker {
@@ -182,15 +212,16 @@ h1 {
   font-family: "Bitmgothic", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
   max-width: 100%;
   overflow: hidden;
-  margin: 8px 0 14px;
-  font-size: clamp(38px, 6.8vw, 62px);
+  margin: 18px 0 28px;
+  font-size: clamp(52px, 7.7vw, 78px);
   font-weight: 400;
-  line-height: 1.12;
-  letter-spacing: 0.045em;
+  line-height: 1.18;
+  letter-spacing: 0.035em;
   color: var(--ink);
   text-shadow:
-    0 0 18px rgba(94, 242, 255, 0.18),
-    0 0 38px rgba(245, 241, 232, 0.1);
+    0 0 16px rgba(94, 242, 255, 0.22),
+    0 0 48px rgba(94, 242, 255, 0.16),
+    0 0 74px rgba(245, 241, 232, 0.09);
 }
 
 .mode-question {
@@ -569,6 +600,10 @@ body.experience-active .cookie-banner {
   transform: translateY(-8px);
 }
 
+body.experience-active #app::before {
+  opacity: 0;
+}
+
 body.experience-active .experience-toolbar {
   opacity: 0.34;
   pointer-events: auto;
@@ -656,11 +691,12 @@ body.experience-active.fullscreen-unavailable .experience-toolbar {
   .panel {
     top: 52%;
     left: 8px;
-    right: 8px;
-    width: auto;
-    max-width: none;
+    right: auto;
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
     max-height: calc(100dvh - 112px);
-    padding: 14px;
+    padding: 20px 16px;
+    overflow-x: hidden;
     transform: translateY(-50%);
   }
 
@@ -669,9 +705,10 @@ body.experience-active.fullscreen-unavailable .experience-toolbar {
   }
 
   .brand-title {
-    margin: 10px 0 16px;
-    font-size: clamp(31px, 7vw, 38px);
-    letter-spacing: 0.02em;
+    margin: 14px 0 22px;
+    font-size: clamp(39px, 10.2vw, 50px);
+    line-height: 1.16;
+    letter-spacing: 0.015em;
   }
 
   .actions {
