@@ -106,7 +106,7 @@ function createField(screen, random, preset = QUALITY_PRESETS.high) {
       z,
       size: core ? 0.42 + random() * 0.78 : 0.52 + random() * 1.55,
       bloom: core ? 0.8 + random() * 1.4 : random() < 0.22 ? 0.35 + random() * 0.9 : 0,
-      speed: core ? 0.048 + random() * 0.046 : 0.065 + random() * 0.075,
+      speed: core ? 0.036 + random() * 0.0345 : 0.04875 + random() * 0.05625,
       phase: random(),
       trail: 0.04 + random() * 0.07,
       color:

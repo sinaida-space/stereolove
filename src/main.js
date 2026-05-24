@@ -19,6 +19,7 @@ const nextQuestionButton = document.querySelector("#nextQuestionButton");
 const cameraOffButton = document.querySelector("#cameraOffButton");
 const soundToggleButton = document.querySelector("#soundToggleButton");
 const exitExperienceButton = document.querySelector("#exitExperienceButton");
+const gestureOverlay = document.querySelector("#gestureOverlay");
 const calibrationMeter = document.querySelector("#calibrationMeter");
 const cookieBanner = document.querySelector("#cookieBanner");
 const cookieAcceptButton = document.querySelector("#cookieAcceptButton");
@@ -493,6 +494,7 @@ function updateReadingState(dt, activeQuestion) {
 function updateGestureState(dt, now) {
   gestureCooldown = Math.max(0, gestureCooldown - dt);
   gestureTransition = Math.max(0, gestureTransition - dt * 1.45);
+  if (gestureOverlay) gestureOverlay.classList.toggle("visible", gestureTransition > 0.18);
 
   if (pendingGestureQuestion && gestureTransition < 0.58) {
     pendingGestureQuestion = false;
