@@ -20,6 +20,8 @@ The piece is called **The Reality Negotiator**. It uses psychedelic geometry, op
 
 Read the full concept in [docs/CONCEPT.md](docs/CONCEPT.md).
 
+For a reusable product blueprint, read [docs/PRD.md](docs/PRD.md). It describes the requirements for recreating Stereolove-style perceptual web installations with different themes, content, or visual systems.
+
 ## Quick Start
 
 Install dependencies:
