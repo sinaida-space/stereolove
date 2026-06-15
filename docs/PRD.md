@@ -1,8 +1,8 @@
-# Product Requirements Document: Stereolove-Style Perceptual Web Installation
+# Product Requirements Document: VOOIDY-Style Perceptual Web Installation
 
 ## 1. Product Summary
 
-Stereolove is an interactive browser-based perceptual artwork that treats the screen as a responsive optical volume rather than a flat image. The viewer changes the virtual viewpoint through head tracking, mouse movement, or touch. A hidden anamorphic text constellation becomes readable only from specific viewing angles, then dissolves back into scattered light.
+VOOIDY is an interactive browser-based perceptual artwork that treats the screen as a responsive optical volume rather than a flat image. The viewer changes the virtual viewpoint through head tracking, mouse movement, or touch. A hidden anamorphic text constellation becomes readable only from specific viewing angles, then dissolves back into scattered light.
 
 This PRD is written as a reusable blueprint for recreating similar projects: browser-native, head-coupled, camera-optional, visually immersive artworks about perception, spatial illusion, memory, identity, or the instability of reality.
 
@@ -185,6 +185,61 @@ Question rules:
 - No prompts requiring another person to answer.
 - No medical, diagnostic, or manipulative language.
 - Keep each question short enough to resolve into readable multi-line text.
+
+### 8.1 Current Question Bank
+
+The current implementation includes the following question bank:
+
+1. What is something about you that people usually notice too late?
+2. What kind of person makes you feel instantly safe?
+3. When do you feel most respected without anyone saying the word "respect"?
+4. What part of you do people often misunderstand because they only see the surface?
+5. What is a small detail that reveals a lot about who you are?
+6. What do you quietly admire in others because you wish you allowed yourself more of it?
+7. What kind of attention makes you open up instead of shut down?
+8. When was the last time you felt genuinely seen?
+9. What do you wish someone would ask you, but no one ever does?
+10. What is something you care about more than you usually admit?
+11. What kind of beauty makes you stop thinking for a moment?
+12. What memory still feels strangely alive inside you?
+13. What do you protect in yourself even when no one knows you are protecting it?
+14. What kind of people make you become softer?
+15. What kind of people make you become sharper?
+16. What is something you learned to hide because it made others uncomfortable?
+17. What do you reveal only when you trust someone?
+18. What makes you feel emotionally at home?
+19. What is a quality in yourself that you had to fight to keep?
+20. What kind of silence feels peaceful to you?
+21. What kind of silence feels dangerous to you?
+22. What is one thing you know about yourself that most people would not guess?
+23. What kind of loyalty means the most to you?
+24. What do you find difficult to forgive in others because it touches something personal in you?
+25. What do you forgive too easily?
+26. What is a part of you that became strong because it had no other choice?
+27. When do you feel most powerful without needing to prove anything?
+28. What kind of love makes you feel free rather than owned?
+29. What kind of care actually reaches you?
+30. What do you need from people when you are not at your best?
+31. What do you usually do when you feel emotionally exposed?
+32. What do you wish people understood about your distance?
+33. What do you wish people understood about your intensity?
+34. What kind of compliment reaches deeper than appearance or achievement?
+35. What do you want to be known for by the people who truly matter?
+36. What is something you are still becoming?
+37. What version of yourself do you miss, even if you could never return to it?
+38. What version of yourself are you proud you survived?
+39. What are you more sensitive to than you pretend to be?
+40. What do you notice about people that they rarely notice about themselves?
+41. What kind of conversation makes you lose track of time?
+42. What kind of person earns your honesty?
+43. What makes you feel chosen, not just liked?
+44. What do you need to feel before you can trust someone?
+45. What is one thing you would never want to become?
+46. What do you hope has not disappeared from you?
+47. What do you want to be brave enough to choose?
+48. What would your life look like if it was built around your real nature, not your adaptations?
+49. What do you think your soul has been trying to teach you for years?
+50. What part of you is waiting for permission to exist fully?
 
 ## 9. Privacy Requirements
 
