@@ -19,11 +19,11 @@ export async function createFaceTracker() {
     `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`,
   );
 
-  faceLandmarker = await FaceLandmarkerTask.createFromOptions(vision, {
+  const optionsForDelegate = (delegate) => ({
     baseOptions: {
       modelAssetPath:
         "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
-      delegate: "CPU",
+      delegate,
     },
     runningMode: "VIDEO",
     numFaces: 1,
@@ -31,6 +31,18 @@ export async function createFaceTracker() {
     minFacePresenceConfidence: 0.55,
     minTrackingConfidence: 0.55,
   });
+
+  try {
+    faceLandmarker = await FaceLandmarkerTask.createFromOptions(
+      vision,
+      optionsForDelegate("GPU"),
+    );
+  } catch {
+    faceLandmarker = await FaceLandmarkerTask.createFromOptions(
+      vision,
+      optionsForDelegate("CPU"),
+    );
+  }
 
   return faceLandmarker;
 }

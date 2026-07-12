@@ -19,11 +19,11 @@ export async function createHandTracker() {
     `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`,
   );
 
-  handLandmarker = await HandLandmarkerTask.createFromOptions(vision, {
+  const optionsForDelegate = (delegate) => ({
     baseOptions: {
       modelAssetPath:
         "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task",
-      delegate: "CPU",
+      delegate,
     },
     runningMode: "VIDEO",
     numHands: 1,
@@ -31,6 +31,18 @@ export async function createHandTracker() {
     minHandPresenceConfidence: 0.52,
     minTrackingConfidence: 0.52,
   });
+
+  try {
+    handLandmarker = await HandLandmarkerTask.createFromOptions(
+      vision,
+      optionsForDelegate("GPU"),
+    );
+  } catch {
+    handLandmarker = await HandLandmarkerTask.createFromOptions(
+      vision,
+      optionsForDelegate("CPU"),
+    );
+  }
 
   return handLandmarker;
 }
