@@ -58,6 +58,8 @@ let readinessCostAverage = 0;
 let readinessFrames = 0;
 let deviceReady = false;
 let coolFrames = 0;
+let hotStreak = 0;
+let faceTrackerWarmed = false;
 let questionDeck = [];
 let questionDeckCursor = 0;
 let currentQuestionBatch = [];
@@ -250,7 +252,6 @@ function animate() {
   const frameInterval = getFrameInterval();
   if (now - previousFrameTime < frameInterval) return;
 
-  const renderStart = performance.now();
   const time = (now - startTime) * 0.001;
   const dt = Math.min((now - previousFrameTime) * 0.001, 0.07);
   previousFrameTime = now;
@@ -270,6 +271,7 @@ function animate() {
   updateCalibrationState(dt);
   revealFlash = Math.max(0, revealFlash - dt * 0.82);
 
+  const renderStart = performance.now();
   drawScene(ctx, scene, {
     viewport,
     dpr,
@@ -422,11 +424,13 @@ function getInitialPerformanceLevel() {
 
 function updatePerformanceBudget(renderCost, frameInterval) {
   renderCostAverage = renderCostAverage ? renderCostAverage * 0.92 + renderCost * 0.08 : renderCost;
-  const overload = renderCostAverage > frameInterval * 0.94 || renderCost > frameInterval * 1.45;
+  const overloaded = renderCostAverage > frameInterval * 0.94;
+  hotStreak = overloaded ? hotStreak + 1 : 0;
 
-  if (overload && performanceLevel < FRAME_PROFILES.length - 1) {
+  if (hotStreak >= 12 && performanceLevel < FRAME_PROFILES.length - 1) {
     setPerformanceLevel(performanceLevel + 1);
     coolFrames = 0;
+    hotStreak = 0;
     return;
   }
 
@@ -468,6 +472,12 @@ function markDeviceReady(message = performanceLevel >= 2 ? "Light mode ready" : 
   deviceReady = true;
   setInteractionReady(true);
   if (!document.body.classList.contains("experience-active")) setStatus(message, "live");
+  if (!faceTrackerWarmed) {
+    faceTrackerWarmed = true;
+    setTimeout(() => {
+      createFaceTracker().catch(() => {});
+    }, 300);
+  }
 }
 
 function setInteractionReady(ready) {
