@@ -19,7 +19,18 @@ package.json and the license files in node_modules for exact terms.
 
 ## Bitmgothic — `assets/fonts/Bitmgothic.woff`
 
-LICENSE UNVERIFIED. This font ships in the repository without a license
-file. Confirm its terms before the next release, and replace it if
-redistribution is not permitted.
+Designed by Nomi. Distributed by 1001Fonts under their
+"Free for Commercial Use" license.
+https://www.1001fonts.com/bitmgothic-font.html
+https://www.1001fonts.com/licenses/ffc.html
+
+Free for personal and commercial use. Conversion to WOFF for web use is
+explicitly permitted, provided the typeface itself is not modified, and
+it has not been modified here.
+
+One open point: the same license says the typeface "may not be sold or
+published without written permission by its respective author", which
+reads on redistributing the font file itself. The WOFF is committed to
+this public repository, so written permission from Nomi should be
+obtained, or the file served from elsewhere.
 
