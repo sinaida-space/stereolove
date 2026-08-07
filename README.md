@@ -112,3 +112,12 @@ References:
 - [MediaPipe Hand Landmarker for Web](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker/web_js)
 - [Head-coupled perspective](https://en.wikipedia.org/wiki/Head-coupled_perspective)
 - [Google Chrome Experiment: Head-Coupled 3D Transforms](https://experiments.withgoogle.com/chrome/head-coupled-3d-transforms)
+
+## License
+
+Code: Apache 2.0, see [LICENSE](LICENSE).
+Artwork, visual design and text: CC BY-NC-ND 4.0,
+see [LICENSE-ARTWORK](LICENSE-ARTWORK).
+Third-party code: [THIRD-PARTY.md](THIRD-PARTY.md).
+
+© 2026 Sinaida Krivchenko · [sinaida.eu](https://sinaida.eu)
