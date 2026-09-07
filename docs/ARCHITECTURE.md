@@ -24,15 +24,25 @@ The structural geometry avoids autonomous drift. Rings and spokes do not rotate 
 
 The read lock is handled in `src/main.js`. Eye movement is smoothed with time-based damping. When the eye is near the reveal position and remains still, `readingHold` rises and `src/scene.js` strengthens the existing anamorphic point text instead of drawing a separate text layer. Edge samples from the same point cloud form a thin glowing contour hint around the dots. The lock is intentionally forgiving: once the prompt resolves, `readingGrace` keeps it readable for at least three seconds even if the viewer moves. After the hold period, `readingSmoke` moves the points and contour into a smoke-like drift before the text disappears. Compact screens use wider lock thresholds and reduced scatter amplitude to reduce visual strain.
 
-Performance is adaptive rather than fixed. `src/main.js` measures render cost and moves through high, balanced, low, and panic profiles when a device cannot keep up. Those profiles cap frame rate, lower DPR, rebuild the scene with smaller particle sets, and pass `performanceLevel` into `src/scene.js`. The renderer then draws fewer star particles, fewer question dots, fewer tunnel passes, and disables expensive shadow-blur text work in low modes. Hidden tabs skip drawing and MediaPipe work entirely.
+Performance is adaptive rather than fixed. `src/main.js` moves through high, balanced, low, and panic profiles when a device cannot keep up. Those profiles cap frame rate, lower DPR, rebuild the scene with smaller particle sets, and pass `performanceLevel` into `src/scene.js`. The renderer then draws fewer star particles, fewer question dots, and fewer tunnel passes. Hidden tabs skip drawing and MediaPipe work entirely.
 
-Question order is managed as a shuffled session deck in `src/main.js`. The renderer keeps only a small batch of question point clouds in memory for performance, then builds the next batch when the current one is exhausted. This avoids repeats through the deck without sampling all prompts at startup.
+The budget watches `renderCost`, the time the `drawScene` call itself takes. A single frame far over budget (the shape the shadowBlur freeze took) drops the profile immediately, without waiting for the twelve-frame streak the slow path needs. It deliberately does not watch the gap between rendered frames: that also grows during ordinary main-thread work unrelated to rendering, such as the MediaPipe warm-up or a fullscreen transition, and treating those as a rendering stall was a bug caught and reverted after this fix first shipped.
+
+Question order is managed as a shuffled session deck in `src/main.js`. The renderer keeps only a small batch of question point clouds in memory, and each cloud inside that batch is built on first use, because rasterising a prompt and scanning its pixels is far too slow to do twelve times during a resize. `selectActiveQuestion` materialises the plane being looked at, and the plane after it is prepared during an idle callback.
 
 This is different from a stereogram. It does not create binocular disparity. It creates motion parallax and off-axis perspective.
 
+## Render Budget
+
+One rule governs every glow in `src/scene.js`: never set `shadowBlur` while the context is in `globalCompositeOperation = "lighter"`. The compositor cannot blur straight into a blended destination, so it allocates a full-bounds offscreen layer for each shadowed draw. The scene issues around nine hundred glowing draws per frame, and that path measured 2500 ms to 3800 ms per frame on a 2041 x 1161 canvas, enough to starve the GPU process and stall the whole machine. The same frames measure under 20 ms once the shadow is gone.
+
+Glow is built three other ways instead. Stars blit a radial gradient baked once into a 64 x 64 sprite per colour. Tunnel lines draw a wider low-alpha halo stroke under the core stroke. The halo around a resolved question renders into a half-resolution offscreen where `shadowBlur` is safe because that context stays on `source-over`, and the result is composited back as one additive blit, cached until its content key changes.
+
+Fill rate is the other budget. The background and its two full-screen gradients, and the edge vignette, are baked into layers that live as long as the viewport size. `getMaxDpr` caps the canvas at 2.6 megapixels rather than at a fixed device-pixel ratio, so a large external display does not multiply the cost of every frame.
+
 ## Camera Dependency
 
-The first render does not depend on MediaPipe. Face tracking is loaded when the user presses `Use camera`; hand tracking loads after the camera stream starts so the main camera experience is not blocked by the larger hand model. Both trackers run on throttled intervals because MediaPipe video detection is synchronous, and face and hand inference are not run in the same animation frame. The trackers use the CPU delegate to avoid competing with canvas compositing on weak GPUs. If hand tracking fails, head tracking and pointer fallback still work.
+The first render does not depend on MediaPipe. Face tracking is loaded when the user presses `Use camera`; hand tracking loads after the camera stream starts so the main camera experience is not blocked by the larger hand model. Both trackers run on throttled intervals because MediaPipe video detection is synchronous, and face and hand inference are not run in the same animation frame. The trackers ask for the GPU delegate and fall back to CPU when that fails. If hand tracking fails, head tracking and pointer fallback still work.
 
 ## Browser Requirements
 
