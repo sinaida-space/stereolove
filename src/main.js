@@ -7,7 +7,7 @@ import { createScene, drawScene, selectActiveQuestion } from "./scene.js";
 import { deriveFaceEye, derivePointerEye, lerp, makeScreen } from "./projection.js";
 
 const canvas = document.querySelector("#stage");
-const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const ctx = canvas.getContext("2d", { alpha: false });
 const video = document.querySelector("#webcam");
 const statusDot = document.querySelector("#statusDot");
 const statusText = document.querySelector("#statusText");
@@ -35,6 +35,7 @@ const FRAME_PROFILES = [
   { name: "panic", desktopFps: 28, compactFps: 20, faceMs: 340, handMs: 760 },
 ];
 const READINESS_FRAMES = 8;
+const PIXEL_BUDGET = 2.6e6;
 
 let dpr = 1;
 let viewport = { width: 1, height: 1 };
@@ -82,6 +83,8 @@ let lastQuestionChangeAt = performance.now();
 let motionX = 0;
 let motionY = 0;
 let motionStretch = 0;
+let sceneRebuildTimer = 0;
+let planePrefetchHandle = 0;
 
 const pointer = { x: 0, y: 0 };
 const eye = { ...DEFAULT_EYE };
@@ -177,8 +180,12 @@ window.addEventListener("pointerleave", () => {
 });
 
 window.addEventListener("resize", () => {
+  // Resizing the canvas is cheap and has to happen now or the frame stretches.
+  // Rebuilding the scene is not, and macOS emits resize continuously while a
+  // window is dragged, so it waits until the drag settles.
   resize();
-  scene = createScene(screen, Math.random, getSceneQuality(), currentQuestionBatch);
+  clearTimeout(sceneRebuildTimer);
+  sceneRebuildTimer = setTimeout(rebuildScene, 200);
 });
 
 document.addEventListener("visibilitychange", () => {
@@ -250,10 +257,11 @@ function animate() {
   }
 
   const frameInterval = getFrameInterval();
-  if (now - previousFrameTime < frameInterval) return;
+  const elapsed = now - previousFrameTime;
+  if (elapsed < frameInterval) return;
 
   const time = (now - startTime) * 0.001;
-  const dt = Math.min((now - previousFrameTime) * 0.001, 0.07);
+  const dt = Math.min(elapsed * 0.001, 0.07);
   previousFrameTime = now;
 
   if (cameraMode) {
@@ -301,8 +309,11 @@ function animate() {
     nextReadoutAt = now + 180;
   }
   const renderCost = performance.now() - renderStart;
-  updatePerformanceBudget(renderCost, frameInterval);
-  updateReadiness(renderCost, frameInterval);
+  const emergencyStepDown = updatePerformanceBudget(renderCost, frameInterval);
+  // The emergency branch already moved performanceLevel for this frame's sample;
+  // letting updateReadiness judge the same sample too could drop a second level
+  // in one frame.
+  if (!emergencyStepDown) updateReadiness(renderCost, frameInterval);
 }
 
 function detectFace(now) {
@@ -388,9 +399,12 @@ function getCurrentProfile() {
 
 function getMaxDpr() {
   if (isCompactViewport()) return 1;
-  if (performanceLevel >= 3) return 1;
   if (performanceLevel >= 2) return 1;
-  return 1.35;
+
+  // Cap total pixels rather than the ratio, so a large external display does
+  // not quietly multiply the per-frame fill cost.
+  const pixels = Math.max(1, window.innerWidth * window.innerHeight);
+  return Math.min(1.35, Math.max(0.75, Math.sqrt(PIXEL_BUDGET / pixels)));
 }
 
 function getFrameInterval() {
@@ -423,6 +437,21 @@ function getInitialPerformanceLevel() {
 }
 
 function updatePerformanceBudget(renderCost, frameInterval) {
+  // A single frame this far over budget means the machine is already stalling
+  // on the draw call itself (this is what a shadowBlur-under-"lighter" freeze
+  // looks like: renderCost in the seconds). Waiting twelve frames to react
+  // would mean waiting seconds. Deliberately NOT based on the gap between
+  // rendered frames — that also fires on unrelated main-thread work (the
+  // MediaPipe warm-up, a fullscreen transition), which isn't this bug.
+  if (renderCost > frameInterval * 3 && performanceLevel < FRAME_PROFILES.length - 1) {
+    const overshoot = renderCost / frameInterval;
+    setPerformanceLevel(overshoot > 8 ? FRAME_PROFILES.length - 1 : performanceLevel + 1);
+    renderCostAverage = 0;
+    hotStreak = 0;
+    coolFrames = 0;
+    return true;
+  }
+
   renderCostAverage = renderCostAverage ? renderCostAverage * 0.92 + renderCost * 0.08 : renderCost;
   const overloaded = renderCostAverage > frameInterval * 0.94;
   hotStreak = overloaded ? hotStreak + 1 : 0;
@@ -431,7 +460,7 @@ function updatePerformanceBudget(renderCost, frameInterval) {
     setPerformanceLevel(performanceLevel + 1);
     coolFrames = 0;
     hotStreak = 0;
-    return;
+    return true;
   }
 
   if (renderCostAverage < frameInterval * 0.42 && performanceLevel > 0) {
@@ -443,6 +472,7 @@ function updatePerformanceBudget(renderCost, frameInterval) {
   } else {
     coolFrames = 0;
   }
+  return false;
 }
 
 function updateReadiness(renderCost, frameInterval) {
@@ -474,9 +504,13 @@ function markDeviceReady(message = performanceLevel >= 2 ? "Light mode ready" : 
   if (!document.body.classList.contains("experience-active")) setStatus(message, "live");
   if (!faceTrackerWarmed) {
     faceTrackerWarmed = true;
-    setTimeout(() => {
+    // Fetching and compiling the MediaPipe WASM is several megabytes of work
+    // that most visitors never need, so it waits for a genuinely idle moment
+    // rather than competing with the first frames.
+    const schedule = whenIdle(1200);
+    schedule(() => {
       createFaceTracker().catch(() => {});
-    }, 300);
+    });
   }
 }
 
@@ -486,13 +520,41 @@ function setInteractionReady(ready) {
   }
 }
 
+/** requestIdleCallback where it exists, a plain timer where it does not. */
+function whenIdle(fallbackDelay) {
+  return window.requestIdleCallback
+    ? (task) => window.requestIdleCallback(task)
+    : (task) => setTimeout(task, fallbackDelay);
+}
+
+function cancelIdle(handle) {
+  if (!handle) return;
+  if (window.cancelIdleCallback) window.cancelIdleCallback(handle);
+  else clearTimeout(handle);
+}
+
+function rebuildScene() {
+  scene = createScene(screen, Math.random, getSceneQuality(), currentQuestionBatch);
+  questionIndex = Math.min(questionIndex, scene.questionPlanes.length - 1);
+  prefetchNextQuestionPlane();
+}
+
+/** Build the plane after the current one while the browser is idle. */
+function prefetchNextQuestionPlane() {
+  if (!scene?.questionPlanes?.length) return;
+
+  cancelIdle(planePrefetchHandle);
+  planePrefetchHandle = whenIdle(400)(() => {
+    selectActiveQuestion(scene.questionPlanes, questionIndex + 1);
+  });
+}
+
 function setPerformanceLevel(nextLevel) {
   const level = Math.min(FRAME_PROFILES.length - 1, Math.max(0, nextLevel));
   if (level === performanceLevel) return;
   performanceLevel = level;
   resize();
-  scene = createScene(screen, Math.random, getSceneQuality(), currentQuestionBatch);
-  questionIndex = Math.min(questionIndex, scene.questionPlanes.length - 1);
+  rebuildScene();
 }
 
 function setStatus(text, state) {
@@ -643,6 +705,7 @@ function advanceQuestion({ playSound = true, recenter = true } = {}) {
   } else {
     questionIndex += 1;
   }
+  prefetchNextQuestionPlane();
 
   if (recenter) {
     pointer.x = 0;

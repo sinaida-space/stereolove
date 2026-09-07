@@ -15,6 +15,55 @@ const QUALITY_PRESETS = {
   panic: { frames: 8, spokes: 6, stars: 360, outline: 130, fill: 180, sampleStep: 9 },
 };
 
+const GLOW_SPRITE_SIZE = 64;
+const GLYPH_GLOW_SCALE = 0.5;
+const glowSprites = new Map();
+let backdropLayer = null;
+let vignetteLayer = null;
+let glyphGlowLayer = null;
+let glyphGlowKey = "";
+
+/**
+ * A radial glow baked once into a small offscreen canvas.
+ *
+ * Setting ctx.shadowBlur while the context is in a non-"source-over" blend mode
+ * makes the compositor allocate a full-bounds offscreen layer for every single
+ * draw call. The scene issues ~950 glowing draws per frame, so that path cost
+ * seconds per frame and starved the GPU process. Blitting a cached sprite under
+ * "lighter" produces the same additive bloom for the price of one textured quad.
+ */
+function getGlowSprite(color) {
+  const cached = glowSprites.get(color);
+  if (cached) return cached;
+
+  const sprite = document.createElement("canvas");
+  sprite.width = GLOW_SPRITE_SIZE;
+  sprite.height = GLOW_SPRITE_SIZE;
+  const half = GLOW_SPRITE_SIZE / 2;
+  const spriteCtx = sprite.getContext("2d");
+  const gradient = spriteCtx.createRadialGradient(half, half, 0, half, half, half);
+  gradient.addColorStop(0, `rgba(${color}, 0.9)`);
+  gradient.addColorStop(0.18, `rgba(${color}, 0.42)`);
+  gradient.addColorStop(0.45, `rgba(${color}, 0.12)`);
+  gradient.addColorStop(0.72, `rgba(${color}, 0.03)`);
+  gradient.addColorStop(1, `rgba(${color}, 0)`);
+  spriteCtx.fillStyle = gradient;
+  spriteCtx.fillRect(0, 0, GLOW_SPRITE_SIZE, GLOW_SPRITE_SIZE);
+
+  glowSprites.set(color, sprite);
+  return sprite;
+}
+
+/** Offscreen canvas reused while the viewport keeps its size. */
+function acquireLayer(layer, width, height) {
+  if (layer && layer.canvas.width === width && layer.canvas.height === height) return layer;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  return { canvas, ctx: canvas.getContext("2d") };
+}
+
 export function createScene(screen, random = Math.random, quality = "high", questionSet = null) {
   const preset = QUALITY_PRESETS[quality] ?? QUALITY_PRESETS.high;
   const frames = createFrames(screen, random, preset);
@@ -26,6 +75,10 @@ export function createScene(screen, random = Math.random, quality = "high", ques
 }
 
 export function drawScene(ctx, scene, state) {
+  // A zero-area viewport (a hidden tab, a collapsed pane) would make the cached
+  // layers zero-sized, and drawImage throws on a zero-sized source.
+  if (state.viewport.width < 1 || state.viewport.height < 1) return;
+
   const activeQuestion = selectActiveQuestion(scene.questionPlanes, state.questionIndex);
 
   drawVoid(ctx, state);
@@ -38,7 +91,13 @@ export function drawScene(ctx, scene, state) {
 
 export function selectActiveQuestion(questionPlanes, index = 0) {
   if (!questionPlanes.length) return null;
-  return questionPlanes[Math.abs(Math.floor(index)) % questionPlanes.length];
+
+  const slot = questionPlanes[Math.abs(Math.floor(index)) % questionPlanes.length];
+  if (slot.build) {
+    Object.assign(slot, slot.build());
+    delete slot.build;
+  }
+  return slot;
 }
 
 export function createFrames(screen, random = Math.random, preset = QUALITY_PRESETS.high) {
@@ -130,34 +189,46 @@ function createQuestionPlanes(screen, random, preset = QUALITY_PRESETS.high, que
   const revealRangeX = touchFriendly ? 0.34 : 0.52;
   const revealRangeY = touchFriendly ? 0.2 : 0.3;
 
-  return picked.map((question, index) => {
-    const x = Math.sin(index * 1.47) * screen.width * 0.1;
-    const y = Math.cos(index * 1.21) * screen.height * 0.09;
-    const rot = (random() - 0.5) * 0.09;
-    const revealEye = {
-      x: (random() - 0.5) * revealRangeX,
-      y: (random() - 0.5) * revealRangeY,
-      z: DEFAULT_EYE.z,
-    };
-    const points = createAnamorphicQuestionPoints(
-      sampleQuestionPoints(question, random, preset),
-      { x, y, rot, revealEye },
-      screen,
-      random,
-    );
+  // Building one plane rasterises the question into an offscreen canvas and
+  // scans every pixel, so twelve of them up front is a visible stall on load,
+  // on resize and on every quality change. Only the plane being looked at is
+  // ever drawn, so the rest are built on first access.
+  return picked.map((question, index) => ({
+    question,
+    build: () => buildQuestionPlane(question, index, screen, random, preset, {
+      revealRangeX,
+      revealRangeY,
+    }),
+  }));
+}
 
-    return {
-      question,
-      lines: wrapQuestion(question),
-      points,
-      outlinePoints: points.filter((point) => point.edge).sort((a, b) => a.edgeOrder - b.edgeOrder),
-      x,
-      y,
-      rot,
-      revealEye,
-      color: TEXT_COLORS[index % TEXT_COLORS.length],
-    };
-  });
+function buildQuestionPlane(question, index, screen, random, preset, ranges) {
+  const x = Math.sin(index * 1.47) * screen.width * 0.1;
+  const y = Math.cos(index * 1.21) * screen.height * 0.09;
+  const rot = (random() - 0.5) * 0.09;
+  const revealEye = {
+    x: (random() - 0.5) * ranges.revealRangeX,
+    y: (random() - 0.5) * ranges.revealRangeY,
+    z: DEFAULT_EYE.z,
+  };
+  const points = createAnamorphicQuestionPoints(
+    sampleQuestionPoints(question, random, preset),
+    { x, y, rot, revealEye },
+    screen,
+    random,
+  );
+
+  return {
+    question,
+    lines: wrapQuestion(question),
+    points,
+    outlinePoints: points.filter((point) => point.edge).sort((a, b) => a.edgeOrder - b.edgeOrder),
+    x,
+    y,
+    rot,
+    revealEye,
+    color: TEXT_COLORS[index % TEXT_COLORS.length],
+  };
 }
 
 export function anamorphicPointForView(screenPoint, z, revealEye) {
@@ -272,10 +343,17 @@ function drawVoid(ctx, state) {
   const vanishing = vanishingPoint(state);
   const flash = state.revealFlash ?? 0;
 
-  ctx.fillStyle = PALETTE.background;
-  ctx.fillRect(0, 0, viewport.width, viewport.height);
+  // The background and its two full-screen gradients never change while the
+  // viewport keeps its size, so they are baked once and blitted.
+  const layer = acquireLayer(backdropLayer, viewport.width, viewport.height);
+  if (layer !== backdropLayer) {
+    backdropLayer = layer;
+    layer.ctx.fillStyle = PALETTE.background;
+    layer.ctx.fillRect(0, 0, viewport.width, viewport.height);
+    drawDeepSpaceGradient(layer.ctx, state);
+  }
+  ctx.drawImage(backdropLayer.canvas, 0, 0);
 
-  drawDeepSpaceGradient(ctx, state);
   drawGalaxyMist(ctx, state, vanishing, flash);
 }
 
@@ -318,7 +396,14 @@ function drawGalaxyMist(ctx, state, vanishing, flash) {
   core.addColorStop(0.74, "rgba(24, 72, 82, 0.012)");
   core.addColorStop(1, "rgba(5, 6, 9, 0)");
   ctx.fillStyle = core;
-  ctx.fillRect(0, 0, viewport.width, viewport.height);
+
+  // Outside outerRadius the gradient is fully transparent, so painting the
+  // whole viewport just burns fill rate.
+  const left = clamp(vanishing.x - outerRadius, 0, viewport.width);
+  const top = clamp(vanishing.y - outerRadius, 0, viewport.height);
+  const right = clamp(vanishing.x + outerRadius, 0, viewport.width);
+  const bottom = clamp(vanishing.y + outerRadius, 0, viewport.height);
+  ctx.fillRect(left, top, right - left, bottom - top);
 }
 
 function drawStarField(ctx, points, state) {
@@ -391,22 +476,25 @@ function drawCometTail(ctx, point, trail, projected, radius, alpha, near, dpr) {
 
 function drawStarDot(ctx, point, projected, radius, alpha, near, level, dpr) {
   const bloom = point.bloom ?? 0;
-  const canGlow = level <= 1 && bloom > 0.2;
 
-  if (canGlow) {
-    ctx.shadowColor = `rgba(${point.color}, ${0.22 + near * 0.22})`;
-    ctx.shadowBlur = clamp(radius * (4 + bloom * 3.8) * dpr, 2.5, 18);
+  if (level <= 1 && bloom > 0.2) {
+    const halo = clamp(radius * (3.2 + bloom * 3.1) * dpr, 3, 24);
+    const previousAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = clamp((0.26 + near * 0.26) * alpha * 1.6, 0, 1);
+    ctx.drawImage(
+      getGlowSprite(point.color),
+      projected.x - halo,
+      projected.y - halo,
+      halo * 2,
+      halo * 2,
+    );
+    ctx.globalAlpha = previousAlpha;
   }
 
   ctx.fillStyle = `rgba(${point.color}, ${alpha})`;
   ctx.beginPath();
   ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
   ctx.fill();
-
-  if (canGlow) {
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = "transparent";
-  }
 }
 
 function starPosition(point, progress, depth, state) {
@@ -697,26 +785,38 @@ function drawQuestionLock(ctx, question, state) {
   ctx.globalCompositeOperation = "lighter";
 
   const level = state.performanceLevel ?? 0;
+  const stride = level >= 3 ? 3 : level >= 2 ? 2 : 1;
+
+  // Two halo passes and the sparkle pass all read the same points, so project
+  // each one once per frame instead of three times.
+  const projectedDots = [];
+  for (let i = 0; i < question.outlinePoints.length; i += stride) {
+    const dot = question.outlinePoints[i];
+    const projected = projectPoint(
+      anamorphicQuestionPoint(dot, state, time),
+      eye,
+      screen,
+      viewport,
+      dpr,
+    );
+    if (projected.visible) projectedDots.push({ dot, projected });
+  }
+
   for (const pass of [
     { radius: 3.4, alpha: 0.08 + flash * 0.04 },
     { radius: 1, alpha: 0.52 + flash * 0.12 },
   ]) {
     if (level >= 2 && pass.radius > 1.2) continue;
     if (state.isCompact && pass.radius > 1.2) continue;
-    const stride = level >= 3 ? 3 : level >= 2 ? 2 : 1;
-    for (let i = 0; i < question.outlinePoints.length; i += stride) {
-      const dot = question.outlinePoints[i];
-      const world = anamorphicQuestionPoint(dot, state, time);
-      const projected = projectPoint(world, eye, screen, viewport, dpr);
-      if (!projected.visible) continue;
 
+    ctx.fillStyle = `rgba(245, 241, 232, ${Math.min(0.78, pass.alpha * alpha)})`;
+    for (const { dot, projected } of projectedDots) {
       const compactScale = state.isCompact ? 0.72 : 1;
       const radius = clamp(
         dot.size * projected.scale * (1.65 + flash * 0.5) * compactScale * pass.radius,
         0.42,
         pass.radius > 1.2 ? (state.isCompact ? 3.2 : 7.4) : state.isCompact ? 2.0 : 3.1,
       );
-      ctx.fillStyle = `rgba(245, 241, 232, ${Math.min(0.78, pass.alpha * alpha)})`;
       ctx.beginPath();
       ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
       ctx.fill();
@@ -724,18 +824,16 @@ function drawQuestionLock(ctx, question, state) {
   }
 
   const sparkleLimit = level >= 2 ? 80 : state.isCompact ? 140 : 220;
-  for (const dot of question.outlinePoints.slice(0, sparkleLimit)) {
-    const world = anamorphicQuestionPoint(dot, state, time);
-    const projected = projectPoint(world, eye, screen, viewport, dpr);
-    if (!projected.visible) continue;
-
+  const sparkleCount = Math.min(sparkleLimit, projectedDots.length);
+  ctx.fillStyle = `rgba(${PALETTE.cyan}, ${Math.min(0.62, (0.32 + flash * 0.12) * alpha)})`;
+  for (let i = 0; i < sparkleCount; i += 1) {
+    const { dot, projected } = projectedDots[i];
     const compactScale = state.isCompact ? 0.68 : 1;
     const radius = clamp(
       dot.size * projected.scale * (1.7 + flash * 0.55) * compactScale,
       0.42,
       state.isCompact ? 2.2 : 3.3,
     );
-    ctx.fillStyle = `rgba(${PALETTE.cyan}, ${Math.min(0.62, (0.32 + flash * 0.12) * alpha)})`;
     ctx.beginPath();
     ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
     ctx.fill();
@@ -771,15 +869,31 @@ function drawGlyphOutlineHint(ctx, question, state, alpha, flash) {
   const outlineAlpha = Math.max(smoothstep(0.24, 0.86, alpha) * 0.72, smoke * 0.34);
   if (outlineAlpha <= 0.01) return;
 
+  const centerX = anchor.x + Math.sin(time * 1.3) * smokeAge * smoke * 10 * dpr;
+  const centerY = anchor.y - smokeAge * smoke * 28 * dpr;
+  const font = `650 ${fontSize}px "Avenir Next", "Helvetica Neue", Arial, sans-serif`;
+
+  if (level <= 1) {
+    drawGlyphGlow(ctx, question, {
+      fontSize,
+      dpr,
+      flash,
+      smoke,
+      maxWidth,
+      lineHeight,
+      totalHeight,
+      outlineAlpha,
+      centerX,
+      centerY,
+    });
+  }
+
   ctx.save();
-  ctx.translate(
-    anchor.x + Math.sin(time * 1.3) * smokeAge * smoke * 10 * dpr,
-    anchor.y - smokeAge * smoke * 28 * dpr,
-  );
+  ctx.translate(centerX, centerY);
   ctx.rotate(question.rot * 0.18);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `650 ${fontSize}px "Avenir Next", "Helvetica Neue", Arial, sans-serif`;
+  ctx.font = font;
   ctx.globalCompositeOperation = "lighter";
 
   question.lines.forEach((line, index) => {
@@ -788,21 +902,103 @@ function drawGlyphOutlineHint(ctx, question, state, alpha, flash) {
 
     ctx.lineWidth = Math.max(0.54, 1.46 * dpr);
     ctx.strokeStyle = `rgba(${PALETTE.cyan}, ${(0.34 + flash * 0.12) * outlineAlpha})`;
-    ctx.shadowColor =
-      level <= 1 ? `rgba(${PALETTE.cyan}, ${(1 + flash * 0.28) * outlineAlpha})` : "transparent";
-    ctx.shadowBlur = level <= 1 ? (14 + flash * 10 + smoke * 12) * dpr : 0;
     ctx.strokeText(text, 0, y, maxWidth);
 
     if (level >= 2) return;
 
     ctx.lineWidth = Math.max(0.3, 0.56 * dpr);
     ctx.strokeStyle = `rgba(245, 241, 232, ${(0.48 + flash * 0.14) * outlineAlpha})`;
-    ctx.shadowColor = `rgba(245, 241, 232, ${(0.52 + flash * 0.16) * outlineAlpha})`;
-    ctx.shadowBlur = (5 + flash * 5 + smoke * 10) * dpr;
     ctx.strokeText(text, 0, y, maxWidth);
   });
 
   ctx.restore();
+}
+
+/**
+ * The halo around the resolved question.
+ *
+ * shadowBlur is genuinely the right tool for this look, but it must not be set
+ * while the destination context is in "lighter" mode. So the blur is rendered
+ * into a small offscreen the size of the text block under plain source-over,
+ * then composited additively as a single textured blit.
+ */
+function drawGlyphGlow(ctx, question, options) {
+  const { fontSize, dpr, flash, smoke, maxWidth, lineHeight, totalHeight, outlineAlpha } = options;
+
+  // A blur has no detail worth resolving, so it is rendered at a quarter of the
+  // area and stretched back on the way out.
+  const q = GLYPH_GLOW_SCALE;
+  const spread = (14 + flash * 10 + smoke * 12) * dpr;
+  const margin = Math.ceil(spread * 3);
+  const blockWidth = maxWidth + margin * 2;
+  const blockHeight = totalHeight + lineHeight + margin * 2;
+
+  // Quantised so a slowly drifting font size does not reallocate every frame.
+  const width = quantise(blockWidth * q, 32);
+  const height = quantise(blockHeight * q, 32);
+  const layer = acquireLayer(glyphGlowLayer, width, height);
+  const key = [
+    question.question,
+    Math.round(fontSize),
+    Math.round(flash * 8),
+    Math.round(smoke * 8),
+    Math.round(outlineAlpha * 16),
+  ].join("|");
+  const reusable = layer === glyphGlowLayer && key === glyphGlowKey;
+  glyphGlowLayer = layer;
+  glyphGlowKey = key;
+
+  if (!reusable) paintGlyphGlow(layer, question, options, { q, spread, width, height });
+
+  const drawWidth = width / q;
+  const drawHeight = height / q;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.drawImage(
+    layer.canvas,
+    options.centerX - drawWidth / 2,
+    options.centerY - drawHeight / 2,
+    drawWidth,
+    drawHeight,
+  );
+  ctx.restore();
+}
+
+function paintGlyphGlow(layer, question, options, geometry) {
+  const { fontSize, dpr, flash, smoke, maxWidth, lineHeight, totalHeight, outlineAlpha } = options;
+  const { q, spread, width, height } = geometry;
+
+  const glow = layer.ctx;
+  glow.clearRect(0, 0, width, height);
+  glow.save();
+  glow.translate(width / 2, height / 2);
+  glow.rotate(question.rot * 0.18);
+  glow.textAlign = "center";
+  glow.textBaseline = "middle";
+  glow.font = `650 ${fontSize * q}px "Avenir Next", "Helvetica Neue", Arial, sans-serif`;
+
+  question.lines.forEach((line, index) => {
+    const y = (index * lineHeight - totalHeight / 2) * q;
+    const text = line.toUpperCase();
+
+    glow.lineWidth = Math.max(0.54, 1.46 * dpr) * q;
+    glow.strokeStyle = `rgba(${PALETTE.cyan}, ${(0.34 + flash * 0.12) * outlineAlpha})`;
+    glow.shadowColor = `rgba(${PALETTE.cyan}, ${(1 + flash * 0.28) * outlineAlpha})`;
+    glow.shadowBlur = spread * q;
+    glow.strokeText(text, 0, y, maxWidth * q);
+
+    glow.lineWidth = Math.max(0.3, 0.56 * dpr) * q;
+    glow.strokeStyle = `rgba(245, 241, 232, ${(0.48 + flash * 0.14) * outlineAlpha})`;
+    glow.shadowColor = `rgba(245, 241, 232, ${(0.52 + flash * 0.16) * outlineAlpha})`;
+    glow.shadowBlur = (5 + flash * 5 + smoke * 10) * dpr * q;
+    glow.strokeText(text, 0, y, maxWidth * q);
+  });
+
+  glow.restore();
+}
+
+function quantise(value, step) {
+  return Math.max(step, Math.ceil(value / step) * step);
 }
 
 function drawAperture(ctx, state) {
@@ -815,6 +1011,16 @@ function drawAperture(ctx, state) {
 }
 
 function drawEdgeVignette(ctx, viewport) {
+  // Static per viewport, so bake it once and blit.
+  const layer = acquireLayer(vignetteLayer, viewport.width, viewport.height);
+  if (layer !== vignetteLayer) {
+    vignetteLayer = layer;
+    paintEdgeVignette(layer.ctx, viewport);
+  }
+  ctx.drawImage(vignetteLayer.canvas, 0, 0);
+}
+
+function paintEdgeVignette(ctx, viewport) {
   const edgeX = Math.max(120, viewport.width * 0.18);
   const edgeY = Math.max(90, viewport.height * 0.2);
 
@@ -859,17 +1065,21 @@ function drawWorldLine(ctx, a, b, state, color, alpha, lineWidth = 1) {
   const lineAlpha = clamp(alpha * (0.72 + edgeLight * 0.65) * headLight, 0, 0.86);
   const width = clamp(lineWidth * dpr * (0.42 + scale * 0.92 + edgeLight * 0.22), 0.12, 3.2);
   if ((state.performanceLevel ?? 0) <= 1 && lineAlpha > 0.04) {
-    ctx.shadowColor = `rgba(${color}, ${lineAlpha * 0.42})`;
-    ctx.shadowBlur = clamp(width * (2.6 + edgeLight * 2.4), 0.8, 8);
+    // Additive halo pass. Same reason as drawStarDot: no shadowBlur under "lighter".
+    ctx.strokeStyle = `rgba(${color}, ${lineAlpha * 0.2})`;
+    ctx.lineWidth = width + clamp(width * (2.6 + edgeLight * 2.4), 0.8, 8);
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+    ctx.stroke();
   }
+
   ctx.strokeStyle = `rgba(${color}, ${lineAlpha})`;
   ctx.lineWidth = width;
   ctx.beginPath();
   ctx.moveTo(pa.x, pa.y);
   ctx.lineTo(pb.x, pb.y);
   ctx.stroke();
-  ctx.shadowBlur = 0;
-  ctx.shadowColor = "transparent";
 }
 
 function distanceFromCenter(point, viewport) {
