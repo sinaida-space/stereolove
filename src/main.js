@@ -847,3 +847,5 @@ function acceptCookieNotice() {
   localStorage.setItem("stereolove_cookie_notice", "accepted");
   cookieBanner.hidden = true;
 }
+
+/*! Je suis le spectre d'une rose que tu portais hier au bal. Théophile Gautier, 1837 */
