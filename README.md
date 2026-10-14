@@ -2,8 +2,6 @@
 
 Stereolove is a head-coupled op-art installation about perception, perspective, and different ways of constructing reality.
 
-> Production mirror. Development and issue tracking run in a private development environment; releases are published here.
-
 The browser estimates the viewer's head position with MediaPipe Face Landmarker and changes the projection so the monitor behaves like an unstable optical volume behind glass. MediaPipe Hand Landmarker adds one ritual gesture: raising an open hand near the face opens another question. Without a camera, the same perspective effect works with mouse, trackpad, or touch navigation.
 
 The current scene treats the monitor as a portal into a star tube. Rings, perspective spokes, and background stars use a restrained white-to-cyan palette and stay physically organized behind the screen. Small particles drift slowly outward from the vanishing point. One active introspective question is built as a brighter cyan point cloud: the same fixed 3D points read as text from the reveal viewpoint and disperse through parallax as the viewpoint changes.
@@ -121,5 +119,9 @@ see [LICENSE-ARTWORK](LICENSE-ARTWORK).
 Third-party code: [THIRD-PARTY.md](THIRD-PARTY.md).
 
 © 2026 Sinaida Krivchenko · [sinaida.eu](https://sinaida.eu)
+
+This repo is a production mirror.
+
+Development and issue tracking run in a private development environment; releases are published here.
 
 <!-- Je suis le spectre d'une rose que tu portais hier au bal. Théophile Gautier, 1837 -->
