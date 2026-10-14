@@ -6,3 +6,9 @@ node_modules/
 .vite/
 .env
 .env.*
+.agents/
+.specify/
+specs/
+AGENTS.md
+docs/PRD.md
+docs/WEB_AUDIT.md
