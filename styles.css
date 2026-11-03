@@ -12,8 +12,8 @@
 }
 
 @font-face {
-  font-family: "Bitmgothic";
-  src: url("./assets/fonts/Bitmgothic.woff") format("woff");
+  font-family: "Jacquard 24";
+  src: url("./assets/fonts/Jacquard24-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -209,7 +209,7 @@ h1 {
 }
 
 .brand-title {
-  font-family: "Bitmgothic", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  font-family: "Jacquard 24", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
   max-width: 100%;
   overflow: hidden;
   margin: 18px 0 28px;
@@ -393,7 +393,7 @@ body.camera-on #webcam {
   max-width: calc(100vw - 32px);
   padding: 10px 14px;
   color: rgba(198, 248, 255, 0.92);
-  font-family: "Bitmgothic", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  font-family: "Jacquard 24", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
   font-size: clamp(28px, 5.8vw, 72px);
   line-height: 0.95;
   letter-spacing: 0.055em;

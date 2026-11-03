@@ -17,20 +17,10 @@ https://github.com/google-ai-edge/mediapipe
 Vite, Vitest, ESLint and Prettier, each under its own license. See
 package.json and the license files in node_modules for exact terms.
 
-## Bitmgothic — `assets/fonts/Bitmgothic.woff`
+## Jacquard 24
 
-Designed by Nomi. Distributed by 1001Fonts under their
-"Free for Commercial Use" license.
-https://www.1001fonts.com/bitmgothic-font.html
-https://www.1001fonts.com/licenses/ffc.html
-
-Free for personal and commercial use. Conversion to WOFF for web use is
-explicitly permitted, provided the typeface itself is not modified, and
-it has not been modified here.
-
-One open point: the same license says the typeface "may not be sold or
-published without written permission by its respective author", which
-reads on redistributing the font file itself. The WOFF is committed to
-this public repository, so written permission from Nomi should be
-obtained, or the file served from elsewhere.
-
+File: `assets/fonts/Jacquard24-Regular.ttf`.
+Copyright 2023 The Soft Type Project Authors. Licensed under the SIL Open
+Font License 1.1. The license text sits next to the font:
+`assets/fonts/OFL-Jacquard24.txt`.
+https://github.com/scfried/soft-type-jacquard
