@@ -15,3 +15,11 @@ export const PALETTE = Object.freeze({
   violet: "184, 121, 255",
   green: "124, 255, 155",
 });
+
+// Absolute URL of a file under public/vendor/mediapipe/<version>/, served from this site.
+export function mediapipeAsset(path) {
+  return new URL(
+    `${import.meta.env.BASE_URL}vendor/mediapipe/${MEDIAPIPE_VERSION}/${path}`,
+    window.location.href,
+  ).href;
+}

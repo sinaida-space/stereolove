@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob:; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/ https://storage.googleapis.com/mediapipe-models/hand_landmarker/ https://storage.googleapis.com/mediapipe-models/face_landmarker/; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob:; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta
       name="description"
@@ -79,20 +79,18 @@
           address, browser information, request time, and requested files in server logs.
         </p>
         <p>
-          After the page loads, the browser downloads the MediaPipe library and the Google-hosted
-          face and hand model files in the background, so the camera can start quickly. These
-          requests expose standard technical request data to those providers and carry no camera
-          data. The camera itself starts only after you press the camera button and grant browser
-          permission.
+          The MediaPipe library and the face and hand model files are served from this
+          site. Your browser makes no request to any third party for them, and
+          no camera data leaves your device. The camera starts only after you press the
+          camera button and grant browser permission.
         </p>
       </section>
 
       <section>
         <h2>5. International providers</h2>
         <p>
-          GitHub, CDN providers, and Google-hosted MediaPipe assets may operate infrastructure
-          outside the European Economic Area. Where applicable, those providers are responsible for
-          their own transfer mechanisms and safeguards.
+          GitHub may operate infrastructure outside the European Economic Area. Where applicable,
+          GitHub is responsible for its own transfer mechanisms and safeguards.
         </p>
       </section>
 
