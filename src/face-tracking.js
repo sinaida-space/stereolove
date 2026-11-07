@@ -1,4 +1,4 @@
-import { MEDIAPIPE_VERSION } from "./config.js";
+import { mediapipeAsset } from "./config.js";
 
 let faceLandmarker = null;
 let FaceLandmarkerTask = null;
@@ -8,21 +8,19 @@ export async function createFaceTracker() {
   if (faceLandmarker) return faceLandmarker;
 
   if (!FaceLandmarkerTask || !FilesetResolverTask) {
-    const visionTasks = await import(
-      `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/vision_bundle.mjs`
-    );
+    const visionTasks = await import(/* @vite-ignore */ mediapipeAsset("vision_bundle.mjs"));
     FaceLandmarkerTask = visionTasks.FaceLandmarker;
     FilesetResolverTask = visionTasks.FilesetResolver;
   }
 
   const vision = await FilesetResolverTask.forVisionTasks(
-    `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`,
+    mediapipeAsset("wasm"),
   );
 
   const optionsForDelegate = (delegate) => ({
     baseOptions: {
       modelAssetPath:
-        "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
+        mediapipeAsset("models/face_landmarker.task"),
       delegate,
     },
     runningMode: "VIDEO",

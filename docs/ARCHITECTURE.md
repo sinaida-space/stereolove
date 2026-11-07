@@ -9,7 +9,7 @@ Stereolove is intentionally lightweight. It is a Vite application with a canvas 
 - `src/scene.js` creates and renders the op-art spatial field: screen aperture, centered portal rings, perspective spokes, monochrome particles, glow passes, and active cyan anamorphic question constellations.
 - `src/questions.js` contains introspective English question prompts rendered as optical constellations.
 - `src/projection.js` contains the head-coupled projection math. This module is pure and unit-tested.
-- `src/face-tracking.js` dynamically loads MediaPipe only when camera mode starts.
+- `src/face-tracking.js` dynamically loads MediaPipe (served from public/vendor/mediapipe) only when camera mode starts.
 - `src/hand-tracking.js` dynamically loads MediaPipe Hand Landmarker and extracts a conservative near-face hand gesture for question changes.
 - `src/text-sampler.js` samples canvas text into points that can be distributed through depth.
 - `src/config.js` holds shared constants.

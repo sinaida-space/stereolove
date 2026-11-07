@@ -8,7 +8,9 @@ govern those parts, not the LICENSE file at the root.
 
 ## MediaPipe Tasks Vision
 
-Loaded at runtime from a CDN, not bundled here.
+Version 0.10.35, vendored unchanged in `public/vendor/mediapipe/0.10.35/`
+(library, wasm files and licence). The face and hand landmarker model files
+in `models/` come from storage.googleapis.com/mediapipe-models.
 Copyright Google LLC. Licensed under Apache License 2.0.
 https://github.com/google-ai-edge/mediapipe
 

@@ -1,4 +1,4 @@
-import { MEDIAPIPE_VERSION } from "./config.js";
+import { mediapipeAsset } from "./config.js";
 
 let handLandmarker = null;
 let HandLandmarkerTask = null;
@@ -8,21 +8,19 @@ export async function createHandTracker() {
   if (handLandmarker) return handLandmarker;
 
   if (!HandLandmarkerTask || !FilesetResolverTask) {
-    const visionTasks = await import(
-      `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/vision_bundle.mjs`
-    );
+    const visionTasks = await import(/* @vite-ignore */ mediapipeAsset("vision_bundle.mjs"));
     HandLandmarkerTask = visionTasks.HandLandmarker;
     FilesetResolverTask = visionTasks.FilesetResolver;
   }
 
   const vision = await FilesetResolverTask.forVisionTasks(
-    `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`,
+    mediapipeAsset("wasm"),
   );
 
   const optionsForDelegate = (delegate) => ({
     baseOptions: {
       modelAssetPath:
-        "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task",
+        mediapipeAsset("models/hand_landmarker.task"),
       delegate,
     },
     runningMode: "VIDEO",
